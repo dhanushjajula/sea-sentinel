@@ -451,24 +451,26 @@ class WaterfallViewer {
         ctx.restore();
       }
 
-      // Draw Target IDs and Provenance Label
+      // Draw Target IDs and Priority / Risk Level
       if (this.layers.ids) {
         ctx.save();
-        const provLabel = (srcCategory === "BOTH") ? "YOLO+UNET" : srcCategory.replace("_ONLY", "");
-        const label = `[${t.object_id}] (${provLabel})`;
+        const prioScore = t.priority_score || 85;
+        const prioLevel = t.priority_level || (t.risk_score || "HIGH");
+        const label = `${t.object_id} — ${prioScore} — ${prioLevel}`;
 
         ctx.font = "bold 10px 'JetBrains Mono', monospace";
         const textW = ctx.measureText(label).width;
         const idY = y1 + bh + 14;
 
         if (idY < h) {
-          ctx.fillStyle = "rgba(11, 21, 45, 0.92)";
-          ctx.fillRect(x1, y1 + bh + 2, textW + 8, 16);
-          ctx.strokeStyle = "#00e676";
+          const badgeCol = (prioScore >= 81) ? "#ff3366" : ((prioScore >= 61) ? "#ff9100" : "#00f0ff");
+          ctx.fillStyle = "rgba(4, 10, 24, 0.94)";
+          ctx.fillRect(x1, y1 + bh + 2, textW + 10, 16);
+          ctx.strokeStyle = badgeCol;
           ctx.lineWidth = 1;
-          ctx.strokeRect(x1, y1 + bh + 2, textW + 8, 16);
-          ctx.fillStyle = "#00e676";
-          ctx.fillText(label, x1 + 4, y1 + bh + 14);
+          ctx.strokeRect(x1, y1 + bh + 2, textW + 10, 16);
+          ctx.fillStyle = badgeCol;
+          ctx.fillText(label, x1 + 5, y1 + bh + 14);
         }
         ctx.restore();
       }

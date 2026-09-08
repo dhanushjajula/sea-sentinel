@@ -81,3 +81,27 @@ geospatial:
   default_altitude_m: 12.0
   default_slant_range_m: 75.0
   strict_unreferenced_suppression: true # Strictly withhold synthetic GPS for Case C
+
+risk_priority:
+  hazard_weights:
+    fishing_net: 90        # Very High - wildlife entanglement, ghost fishing, coral smothering
+    shipwreck_fragment: 85 # High - navigation hazard, shallow draft obstruction
+    engine_debris: 80      # High - chemical leaching, heavy metallic snag hazard
+    pipeline_or_cable: 70  # Medium/High - subsea infrastructure, trawling snag
+    plastic_debris: 60     # Medium - microplastic degradation, marine ingestion
+    riprap_debris: 45      # Medium/Low - localized seabed obstruction, ROV hazard
+    default: 50
+  area_thresholds:
+    small_max_sq_m: 5.0
+    medium_max_sq_m: 25.0
+  priority_formula_weights:
+    hazard_risk: 0.45
+    detection_evidence: 0.25
+    object_extent: 0.15
+    location_sensitivity: 0.15
+  reliability_modulation:
+    optimal: 1.00
+    good: 0.95
+    moderate: 0.85
+    noisy: 0.75
+

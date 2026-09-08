@@ -182,28 +182,39 @@ class GISMap {
         const dims = (t.length_m && t.width_m) ? `${Math.round(t.length_m)}m × ${Math.round(t.width_m)}m` : "Estimated 14m × 5m";
         const conf = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
         const isHigher = conf > 75;
-        const prioTag = isHigher 
-          ? '<span style="background:rgba(0,240,255,0.18); color:#00f0ff; border:1px solid rgba(0,240,255,0.4); padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:700;">▲ HIGHER (&gt;75%)</span>'
-          : '<span style="background:rgba(148,163,184,0.18); color:#94a3b8; border:1px solid rgba(148,163,184,0.3); padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:700;">▼ LOWER (≤75%)</span>';
+        const prioScore = t.priority_score || 85;
+        const prioLevel = t.priority_level || (t.risk_score || "HIGH");
+        const hazardRisk = t.hazard_risk || 80;
+        const hazardLevel = t.hazard_risk_level || (t.risk_score || "HIGH");
+
+        const prioTag = `<span style="background:rgba(255,51,102,0.18); color:#ff4d79; border:1px solid rgba(255,51,102,0.4); padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:800; font-family:'JetBrains Mono',monospace;">P: ${prioScore}/100 (${prioLevel})</span>`;
         const formattedClass = (t.class || "Unknown").replace(/_/g, " ");
         const georefCase = t.georeferencing_case ? `Case ${t.georeferencing_case}` : "Case B (Dead-Reckoning)";
         const uncert = t.position_uncertainty_m ? `±${t.position_uncertainty_m}m` : "±1.5m";
 
         const popupContent = `
-          <div style="font-family: 'Outfit', sans-serif; color: #060b18; min-width: 230px; padding: 6px;">
+          <div style="font-family: 'Outfit', sans-serif; color: #060b18; min-width: 250px; padding: 6px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; gap:8px;">
-              <div style="font-weight: 700; font-size: 0.98rem; color: ${color}; font-family: 'JetBrains Mono', monospace;">
+              <div style="font-weight: 800; font-size: 1rem; color: ${color}; font-family: 'JetBrains Mono', monospace;">
                 ${t.object_id}
               </div>
               ${prioTag}
             </div>
-            <div style="font-size: 0.85rem; margin-bottom: 3px;"><b>Acoustic Class:</b> <span style="font-weight:700; color:#0f172a; text-transform:capitalize;">${formattedClass}</span></div>
-            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Confidence:</b> <span style="font-weight:600; font-family:'JetBrains Mono',monospace;">${conf}%</span></div>
-            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Physical Extent:</b> ${dims}</div>
-            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Hazard Risk:</b> <span style="font-weight:700; color:${color}; font-family:'JetBrains Mono',monospace;">${t.risk_score || 'HIGH'}</span></div>
-            <div style="font-size: 0.75rem; margin-bottom: 3px; color:#475569;"><b>Derivation:</b> ${georefCase} (${uncert})</div>
-            <div style="font-size: 0.75rem; color: #0284c7; margin-top: 6px; border-top:1px solid #e2e8f0; padding-top:4px; font-family:'JetBrains Mono',monospace; font-weight:600;">
-              <i class="fa-solid fa-crosshairs"></i> ${this.formatCoordinate(lat, lon)}
+            <div style="font-size: 0.86rem; margin-bottom: 4px;"><b>Type:</b> <span style="font-weight:700; color:#0f172a; text-transform:capitalize;">${formattedClass}</span></div>
+            
+            <div style="background:#f1f5f9; border-radius:4px; padding:6px 8px; margin-bottom:6px; display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:0.75rem;">
+              <div>🎯 <b>AI Conf:</b> <span style="font-weight:700; color:#0284c7; font-family:'JetBrains Mono',monospace;">${conf}%</span></div>
+              <div>⚠️ <b>Hazard:</b> <span style="font-weight:700; color:#e11d48; font-family:'JetBrains Mono',monospace;">${hazardRisk}/100</span></div>
+            </div>
+
+            <div style="font-size: 0.78rem; margin-bottom: 3px;"><b>Extent:</b> ${dims}</div>
+            <div style="font-size: 0.74rem; margin-bottom: 3px; color:#475569;"><b>Derivation:</b> ${georefCase} (${uncert})</div>
+            
+            <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:6px;">
+              <span style="font-size: 0.70rem; color: #0284c7; font-family:'JetBrains Mono',monospace; font-weight:600;">
+                <i class="fa-solid fa-crosshairs"></i> ${this.formatCoordinate(lat, lon)}
+              </span>
+              <button onclick="if(window.app) window.app.openScoreExplanationModal('${t.object_id}')" style="background:#0284c7; color:#ffffff; border:none; border-radius:3px; font-size:0.68rem; font-weight:700; padding:3px 7px; cursor:pointer;">Why this score?</button>
             </div>
           </div>
         `;

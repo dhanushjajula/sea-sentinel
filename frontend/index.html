@@ -104,6 +104,47 @@
         </div>
       </div>
 
+      <!-- 5-Tier Debris Risk & Priority Summary Banner -->
+      <div class="priority-summary-box">
+        <div class="priority-summary-header">
+          <span class="prio-box-title"><i class="fa-solid fa-triangle-exclamation"></i> Inspection Priority Matrix</span>
+          <span class="prio-box-tag">EXPLAINABLE RISK</span>
+        </div>
+        <div class="priority-summary-grid">
+          <div class="prio-cell total">
+            <span class="prio-num" id="kpiTotalDebris">0</span>
+            <span class="prio-lbl">TOTAL DEBRIS</span>
+          </div>
+          <div class="prio-cell crit">
+            <span class="prio-num" id="kpiCriticalCount">0</span>
+            <span class="prio-lbl">CRITICAL</span>
+          </div>
+          <div class="prio-cell high">
+            <span class="prio-num" id="kpiHighCount">0</span>
+            <span class="prio-lbl">HIGH</span>
+          </div>
+          <div class="prio-cell med">
+            <span class="prio-num" id="kpiMedCount">0</span>
+            <span class="prio-lbl">MEDIUM</span>
+          </div>
+          <div class="prio-cell low">
+            <span class="prio-num" id="kpiLowCount">0</span>
+            <span class="prio-lbl">LOW</span>
+          </div>
+        </div>
+        <!-- Highest Priority Debris Card Highlight -->
+        <div class="highest-priority-card" id="highestPriorityCard" style="display: none;">
+          <div class="hp-left">
+            <span class="hp-badge"><i class="fa-solid fa-bell"></i> HIGHEST PRIORITY</span>
+            <div class="hp-name" id="hpDebrisName">#D01 – Ghost Net</div>
+          </div>
+          <div class="hp-right">
+            <div class="hp-score" id="hpDebrisScore">91/100</div>
+            <div class="hp-level critical" id="hpDebrisLevel">CRITICAL</div>
+          </div>
+        </div>
+      </div>
+
       <!-- 2x2 Telemetry Metric Grid -->
       <div class="telemetry-grid">
         <div class="telemetry-cell">
@@ -351,6 +392,19 @@
           <span class="sub-hint"><i class="fa-solid fa-arrow-pointer"></i> Click target to focus &amp; inspect</span>
           <span class="sub-status" id="inspectorFilterHint">All Targets</span>
         </div>
+
+        <!-- Target Sort & Filter Controls -->
+        <div class="inspector-sort-bar">
+          <span class="sort-lbl"><i class="fa-solid fa-arrow-down-short-wide"></i> Sort by:</span>
+          <select id="targetSortSelect" class="sort-select">
+            <option value="priority" selected>⚡ Inspection Priority (Highest)</option>
+            <option value="confidence">🎯 AI Confidence (Highest)</option>
+            <option value="hazard">⚠️ Hazard Risk (Highest)</option>
+            <option value="type">🏷️ Debris Type</option>
+            <option value="extent">📐 Object Extent (Largest)</option>
+          </select>
+        </div>
+
         <div class="target-card-list" id="targetListContainer">
           <!-- Rendered dynamically by app.js -->
         </div>
@@ -395,6 +449,26 @@
 
     </aside>
   </main>
+
+  <!-- =========================================================
+       Explainable "Why this score?" Modal Drawer
+       ========================================================= -->
+  <div class="modal-backdrop" id="scoreExplanationModal" style="display: none;">
+    <div class="modal-card modal-md score-modal">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <div class="modal-subtitle"><i class="fa-solid fa-scale-balanced"></i> EXPLAINABLE RISK &amp; PRIORITY AUDIT</div>
+          <h2 class="modal-title" id="scoreModalTitle">Debris #D01 — Ghost Net</h2>
+        </div>
+        <div class="modal-header-actions">
+          <button class="modal-close" id="btnCloseScoreModal" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="modal-body" id="scoreModalBody">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </div>
 
   <!-- =========================================================
        Ablation Study Comparison Modal

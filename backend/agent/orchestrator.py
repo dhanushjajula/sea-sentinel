@@ -31,6 +31,7 @@ from ai.segmentation.unet_segmenter import UNetSegmenter
 from ai.anomaly_detection.autoencoder import AnomalyDetector
 from ai.anomaly_detection.rock_cluster_filter import DBSCANRockFilter
 from ai.measurement.estimator import DimensionEstimator
+from ai.measurement.risk_priority_engine import RiskPriorityEngine
 from ai.geospatial.geotagger import GeospatialEngine
 from agent.explainability import ExplainabilitySynthesizer
 from agent.audit_logger import SurveyAuditLogger
@@ -122,6 +123,7 @@ class SIHPipelineAgent:
         self.ablation_evaluator = AblationEvaluator()
         self.rock_filter = DBSCANRockFilter(eps=70.0, min_samples=4)
         self.measurer = DimensionEstimator()
+        self.risk_priority_engine = RiskPriorityEngine(config=self.config)
         self.geotagger = GeospatialEngine()
         self.explainer = ExplainabilitySynthesizer()
         self.audit_logger = SurveyAuditLogger()
@@ -478,11 +480,12 @@ class SIHPipelineAgent:
                 effective_case = "C"
                 lat, lon, uncertainty_m = None, None, None
 
-            # Multi-Factor Hazard Risk Assessment
-            risk_score = self._calculate_risk(
-                debris_class=det.get("class"),
-                area_sq_m=dims.get("area_sq_m"),
-                confidence=det.get("confidence", 0.5)
+            # Explainable Multi-Factor Risk & Inspection Priority Scoring Engine
+            rp_scores = self.risk_priority_engine.calculate_debris_scores(
+                target=det,
+                image_context=raw_img,
+                raster_meta=raster_meta,
+                dimensions=dims
             )
 
             # Autoencoder check
@@ -492,11 +495,11 @@ class SIHPipelineAgent:
             explanation = self.explainer.explain_target(
                 detection=det,
                 calibrated_status=det.get("verification_status", "confirmed"),
-                calibrated_conf=det.get("confidence", 0.5),
+                calibrated_conf=rp_scores["detection_confidence"],
                 reconstruction_error=anomaly_res.get("reconstruction_error", 0.0),
                 shadow_verified=det.get("quality_metrics", {}).get("shadow_score", 0.5) > 0.5,
                 is_rock_cluster=det.get("is_rock_cluster", False),
-                risk_level=risk_score,
+                risk_level=rp_scores["priority_level"],
                 dimensions=dims,
                 coordinates={"lat": lat, "lon": lon}
             )
@@ -521,12 +524,55 @@ class SIHPipelineAgent:
             rec["multi_frame_hits"] = det.get("multi_frame_hits", 1)
             rec["quality_metrics"] = det.get("quality_metrics", {})
             rec["anomaly_status"] = "confirmed_debris" if rec["verification_status"] == "confirmed" else "suspicious_anomaly"
-            rec["calibrated_confidence"] = det.get("confidence", 0.5)
             rec["polygon"] = poly
             rec["norm_polygon"] = norm_poly
             rec["mask_available"] = True
             rec["yolo_bbox"] = det.get("yolo_bbox", bbox if "yolo" in det.get("sources", ["yolo"]) else None)
             rec["unet_bbox"] = det.get("unet_bbox", bbox if "unet" in det.get("sources", []) else None)
+
+            # Strict 3-Concept Separation & Scoring Data
+            rec["detection_confidence"] = rp_scores["detection_confidence"]
+            rec["calibrated_confidence"] = rp_scores["detection_confidence"]
+            rec["confidence"] = rp_scores["detection_confidence"]
+            rec["detection_confidence_pct"] = rp_scores["detection_confidence_pct"]
+            rec["hazard_risk"] = rp_scores["hazard_risk"]
+            rec["hazard_risk_level"] = rp_scores["hazard_risk_level"]
+            rec["hazard_score"] = rp_scores["hazard_risk"]
+            rec["hazard_level"] = rp_scores["hazard_risk_level"]
+            rec["priority_score"] = rp_scores["priority_score"]
+            rec["priority_level"] = rp_scores["priority_level"]
+            rec["risk_score"] = rp_scores["priority_level"]
+            rec["risk_level"] = rp_scores["priority_level"].lower()
+
+            # Extent, Location, Quality & Reasons
+            rec["object_size"] = rp_scores["object_size"]
+            rec["object_area"] = rp_scores["object_area"]
+            rec["object_area_unit"] = rp_scores["object_area_unit"]
+            rec["extent_source"] = rp_scores["extent_source"]
+            rec["marine_hazard"] = rp_scores["marine_hazard"]
+            rec["location_sensitivity"] = rp_scores["location_sensitivity"]
+            rec["sonar_quality"] = rp_scores["sonar_quality"]
+            rec["reliability_multiplier"] = rp_scores["reliability_multiplier"]
+            rec["contributing_factors"] = rp_scores["contributing_factors"]
+            rec["reasons"] = rp_scores["reasons"]
+            rec["dynamic_explanation"] = rp_scores["dynamic_explanation"]
+            rec["explanation"] = rp_scores["dynamic_explanation"]
+            rec["recommendation"] = rp_scores["recommendation"]
+            rec["action_recommendation"] = rp_scores["recommendation"]
+            rec["recommendation_code"] = rp_scores["recommendation_code"]
+            rec["score_explanation"] = {
+                "narrative": rp_scores["dynamic_explanation"],
+                "reasons": rp_scores["reasons"],
+                "action_recommendation": rp_scores["recommendation"],
+                "factors_breakdown": {
+                    "ai_confidence": rp_scores["contributing_factors"]["detection_confidence"]["pct"],
+                    "physical_extent": rp_scores["contributing_factors"]["object_extent"]["pct"],
+                    "marine_hazard": rp_scores["contributing_factors"]["marine_hazard"]["pct"],
+                    "location_sensitivity": rp_scores["contributing_factors"]["location_sensitivity"]["pct"],
+                    "sonar_reliability": rp_scores["contributing_factors"]["sonar_reliability"]["pct"]
+                },
+                "factors_detail": rp_scores["contributing_factors"]
+            }
 
             final_objects.append(rec)
 
@@ -558,7 +604,9 @@ class SIHPipelineAgent:
                 y2 = max(y1 + 1, min(annotated_canvas.shape[0], int(bbox.get("y2", 0))))
                 obj_id = obj.get("object_id", "OBJ")
                 cls_name = obj.get("class", "debris").replace("_", " ").upper()
-                conf_pct = int(obj.get("calibrated_confidence", 0) * 100)
+                prio_score = obj.get("priority_score", 85)
+                prio_lvl = obj.get("priority_level", "HIGH")
+                conf_pct = int(obj.get("detection_confidence_pct", 85))
 
                 # 1. Draw U-Net Pixel Segmentation & Keypoint Nodes (Inside Box)
                 poly = obj.get("polygon", [])
@@ -591,8 +639,8 @@ class SIHPipelineAgent:
                 green_color = (0, 235, 0) # Neon Green BGR
                 cv2.rectangle(annotated_canvas, (x1, y1), (x2, y2), green_color, 3)
 
-                # 3. Draw Magenta Label Pill Badge (matching reference)
-                lbl = f"{cls_name} {conf_pct}%"
+                # 3. Draw Magenta Label Pill Badge with ID + Priority + Level
+                lbl = f"{obj_id} · {cls_name} · P:{prio_score} {prio_lvl}"
                 (tw, th), baseline = cv2.getTextSize(lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
                 tag_y1 = max(0, y1 - th - 10)
                 tag_y2 = y1
@@ -623,14 +671,38 @@ class SIHPipelineAgent:
         except Exception:
             pass
 
+        # Sort targets by Priority Score descending by default
+        final_objects.sort(key=lambda o: o.get("priority_score", 0), reverse=True)
+
+        critical_c = sum(1 for d in final_objects if d.get("priority_level") == "CRITICAL" or d.get("priority_score", 0) >= 81)
+        high_c = sum(1 for d in final_objects if d.get("priority_level") == "HIGH" or (61 <= d.get("priority_score", 0) < 81))
+        med_c = sum(1 for d in final_objects if d.get("priority_level") == "MEDIUM" or (31 <= d.get("priority_score", 0) < 61))
+        low_c = sum(1 for d in final_objects if d.get("priority_level") == "LOW" or d.get("priority_score", 0) <= 30)
+
+        highest_target = final_objects[0] if final_objects else None
+
         stats = {
             "total_candidates": len(final_objects),
+            "total_debris": len(final_objects),
+            "critical_count": critical_c,
+            "high_count": high_c,
+            "medium_count": med_c,
+            "low_count": low_c,
+            "high_risk_count": high_c + critical_c,
+            "highest_priority_debris": {
+                "debris_id": highest_target.get("object_id") if highest_target else None,
+                "type": highest_target.get("type") if highest_target else None,
+                "display_name": highest_target.get("display_name") if highest_target else None,
+                "priority_score": highest_target.get("priority_score") if highest_target else 0,
+                "priority_level": highest_target.get("priority_level") if highest_target else "LOW",
+                "detection_confidence_pct": highest_target.get("detection_confidence_pct") if highest_target else 0.0,
+                "hazard_risk": highest_target.get("hazard_risk") if highest_target else 0
+            } if highest_target else None,
             "confirmed_both": fusion_out.get("confirmed_both", 0),
             "yolo_only": fusion_out.get("yolo_only", 0),
             "unet_only": fusion_out.get("unet_only", 0),
             "confirmed_debris": sum(1 for d in final_objects if d.get("verification_status") == "confirmed"),
             "suspicious_anomaly": sum(1 for d in final_objects if d.get("verification_status") == "suspicious"),
-            "high_risk_count": sum(1 for d in final_objects if d.get("risk_score") == "HIGH"),
             "georeferenced_targets": sum(1 for d in final_objects if d.get("latitude") is not None)
         }
 
@@ -738,6 +810,8 @@ class SIHPipelineAgent:
                 "fusion_time_ms": t_fusion
             },
             "summary_statistics": stats,
+            "priority_summary": stats,
+            "highest_priority_debris": stats.get("highest_priority_debris"),
             "profiling": profiling_metrics,
             "report_summary": report_summary,
             "detections": final_objects,

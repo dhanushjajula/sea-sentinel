@@ -16,6 +16,7 @@ class DashboardApp {
     this.currentAnalysisResult = null;
     this.isBackendOnline = false;
     this.isRejected = false;
+    this.currentSort = 'priority';
 
     this._init();
   }
@@ -487,19 +488,31 @@ class DashboardApp {
     let yoloOnlyCount = 0;
     let unetOnlyCount = 0;
 
+    let criticalCount = 0;
+    let highCount = 0;
+    let medCount = 0;
+    let lowCount = 0;
+
     if (!isRejected && this.targets.length > 0) {
       this.targets.forEach(t => {
         const srcCat = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
         if (srcCat === "BOTH") bothCount++;
         else if (srcCat === "YOLO_ONLY") yoloOnlyCount++;
         else if (srcCat === "UNET_ONLY") unetOnlyCount++;
+
+        const prioLevel = (t.priority_level || (t.priority_score >= 80 ? 'CRITICAL' : t.priority_score >= 60 ? 'HIGH' : t.priority_score >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+        if (prioLevel === 'CRITICAL') criticalCount++;
+        else if (prioLevel === 'HIGH') highCount++;
+        else if (prioLevel === 'MEDIUM') medCount++;
+        else lowCount++;
       });
     }
 
     const confirmed = isRejected ? 0 : this.targets.filter(t => (t.verification_status || t.anomaly_status) === "confirmed_debris" || t.verification_status === "confirmed").length;
     const suspicious = isRejected ? 0 : this.targets.filter(t => (t.verification_status || t.anomaly_status) === "suspicious_anomaly" || t.verification_status === "suspicious").length;
-    const highRisk = isRejected ? 0 : this.targets.filter(t => t.risk_score === "HIGH").length;
+    const highRisk = isRejected ? 0 : this.targets.filter(t => (t.risk_score === "HIGH" || t.hazard_level === "HIGH" || t.hazard_level === "CRITICAL")).length;
 
+    // Traditional KPIs
     const elTotal = document.getElementById('kpiTotal');
     if (elTotal) elTotal.textContent = total;
     const elConfirmed = document.getElementById('kpiConfirmed');
@@ -515,6 +528,55 @@ class DashboardApp {
     if (elYolo) elYolo.textContent = yoloOnlyCount;
     const elUnet = document.getElementById('kpiUnetOnlyCount');
     if (elUnet) elUnet.textContent = unetOnlyCount;
+
+    // 5-Tier Priority Matrix KPIs
+    const elKpiTotalDebris = document.getElementById('kpiTotalDebris');
+    if (elKpiTotalDebris) elKpiTotalDebris.textContent = total;
+    const elKpiCritical = document.getElementById('kpiCriticalCount');
+    if (elKpiCritical) elKpiCritical.textContent = criticalCount;
+    const elKpiHigh = document.getElementById('kpiHighCount');
+    if (elKpiHigh) elKpiHigh.textContent = highCount;
+    const elKpiMed = document.getElementById('kpiMedCount');
+    if (elKpiMed) elKpiMed.textContent = medCount;
+    const elKpiLow = document.getElementById('kpiLowCount');
+    if (elKpiLow) elKpiLow.textContent = lowCount;
+
+    // Highest Priority Debris Card
+    const hpCard = document.getElementById('highestPriorityCard');
+    const hpName = document.getElementById('hpDebrisName');
+    const hpScore = document.getElementById('hpDebrisScore');
+    const hpLevel = document.getElementById('hpDebrisLevel');
+
+    if (!isRejected && this.targets.length > 0) {
+      // Find highest priority target
+      const highestTarget = [...this.targets].sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))[0];
+      if (highestTarget) {
+        const pScore = highestTarget.priority_score != null ? Math.round(highestTarget.priority_score) : Math.round((highestTarget.calibrated_confidence || 0.85) * 100);
+        const pLevel = (highestTarget.priority_level || (pScore >= 80 ? 'CRITICAL' : pScore >= 60 ? 'HIGH' : pScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+        const cleanName = (highestTarget.class || 'Debris').replace(/_/g, ' ').toUpperCase();
+
+        if (hpName) hpName.textContent = `#${highestTarget.object_id} (${cleanName})`;
+        if (hpScore) hpScore.textContent = `${pScore}/100`;
+        if (hpLevel) {
+          hpLevel.textContent = pLevel;
+          hpLevel.className = `hp-badge ${pLevel.toLowerCase()}`;
+        }
+        if (hpCard) {
+          hpCard.onclick = () => {
+            this.onTargetSelected(highestTarget.object_id, { fly: true, force: true });
+            this.openScoreExplanationModal(highestTarget.object_id);
+          };
+          hpCard.style.cursor = 'pointer';
+        }
+      }
+    } else {
+      if (hpName) hpName.textContent = isRejected ? "INPUT REJECTED" : "NO TARGETS DETECTED";
+      if (hpScore) hpScore.textContent = "--";
+      if (hpLevel) {
+        hpLevel.textContent = "STANDBY";
+        hpLevel.className = "hp-badge low";
+      }
+    }
 
     const avgConfidence = (!isRejected && this.targets.length > 0)
       ? (this.targets.reduce((acc, t) => acc + (t.calibrated_confidence || t.confidence || 0.85), 0) / this.targets.length * 100)
@@ -586,10 +648,41 @@ class DashboardApp {
       countTag.textContent = `${this.targets.length} TARGET${this.targets.length === 1 ? '' : 'S'}`;
     }
     if (filterHint) {
-      filterHint.textContent = `Parallel Fused`;
+      const sortMap = {
+        'priority': 'Sorted: Priority',
+        'confidence': 'Sorted: AI Conf',
+        'hazard': 'Sorted: Hazard',
+        'type': 'Sorted: Type',
+        'extent': 'Sorted: Extent'
+      };
+      filterHint.textContent = sortMap[this.currentSort] || 'Parallel Fused';
     }
 
-    this.targets.forEach((t, idx) => {
+    // Sort targets according to currentSort
+    const sortedTargets = [...this.targets].sort((a, b) => {
+      if (this.currentSort === 'priority') {
+        const pA = a.priority_score != null ? a.priority_score : (a.calibrated_confidence || 0.8) * 100;
+        const pB = b.priority_score != null ? b.priority_score : (b.calibrated_confidence || 0.8) * 100;
+        return pB - pA;
+      } else if (this.currentSort === 'confidence') {
+        const cA = a.calibrated_confidence != null ? a.calibrated_confidence : (a.confidence || 0);
+        const cB = b.calibrated_confidence != null ? b.calibrated_confidence : (b.confidence || 0);
+        return cB - cA;
+      } else if (this.currentSort === 'hazard') {
+        const hA = a.hazard_score != null ? a.hazard_score : (a.risk_score === 'HIGH' ? 80 : 50);
+        const hB = b.hazard_score != null ? b.hazard_score : (b.risk_score === 'HIGH' ? 80 : 50);
+        return hB - hA;
+      } else if (this.currentSort === 'type') {
+        return (a.class || '').localeCompare(b.class || '');
+      } else if (this.currentSort === 'extent') {
+        const areaA = a.area_sq_m || (a.length_m ? a.length_m * a.width_m : 0);
+        const areaB = b.area_sq_m || (b.length_m ? b.length_m * b.width_m : 0);
+        return areaB - areaA;
+      }
+      return 0;
+    });
+
+    sortedTargets.forEach((t, idx) => {
       const item = document.createElement('div');
       item.className = `target-card ${t.object_id === this.selectedTargetId ? 'active' : ''}`;
       
@@ -597,9 +690,14 @@ class DashboardApp {
       item.onmouseenter = () => this.onTargetSelected(t.object_id, { fly: false });
 
       const conf = Math.round((t.calibrated_confidence || t.confidence || 0.85) * 100);
-      const isHigher = conf > 75;
       const cleanClass = (t.class || 'marine_debris').replace(/_/g, ' ');
-      const risk = t.risk_score || 'HIGH';
+      
+      const prioScore = t.priority_score != null ? Math.round(t.priority_score) : Math.round(conf * 0.95);
+      const prioLevel = (t.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+      
+      const hazardScore = t.hazard_score != null ? Math.round(t.hazard_score) : (t.risk_score === 'HIGH' ? 82 : 45);
+      const hazardLevel = (t.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+
       const vStatus = t.verification_status || "confirmed";
       const isConfirmed = (vStatus === "confirmed");
       const statusLabel = isConfirmed ? "CONFIRMED DEBRIS" : "SUSPICIOUS ANOMALY";
@@ -623,6 +721,7 @@ class DashboardApp {
       const geoLabel = hasCoords ? `<i class="fa-solid fa-location-dot"></i> ${formatDeg(lat, true)}, ${formatDeg(lon, false)}` : `<span style="color:#94a3b8; font-weight:600;"><i class="fa-solid fa-ban"></i> UNREFERENCED (Case C)</span>`;
       const lenM = t.length_m ? Math.round(t.length_m) : 18;
       const widM = t.width_m ? Math.round(t.width_m) : 6;
+      const areaM = t.area_sq_m ? Math.round(t.area_sq_m) : (lenM * widM);
 
       item.innerHTML = `
         <div class="target-card-header">
@@ -635,24 +734,49 @@ class DashboardApp {
           </div>
           <div style="display:flex; align-items:center; gap:4px;">
             <span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span>
-            <span class="hazard-badge ${risk}">${risk}</span>
           </div>
         </div>
-        <div class="target-card-tags">
-          <span class="tag-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
-          <span class="tag-prio ${isHigher ? 'higher' : 'lower'}">${isHigher ? 'HIGHER PRIORITY' : 'LOWER PRIORITY'}</span>
+
+        <div class="target-score-badges-row">
+          <span class="score-pill prio-${prioLevel.toLowerCase()}" title="Inspection Priority Score: ${prioScore}/100 (${prioLevel})">
+            <i class="fa-solid fa-bolt"></i> PRIORITY ${prioScore}/100 <span class="score-level-badge">${prioLevel}</span>
+          </span>
+          <span class="score-pill conf" title="AI Detection Confidence: ${conf}%">
+            <i class="fa-solid fa-crosshairs"></i> CONF ${conf}%
+          </span>
+          <span class="score-pill hazard-${hazardLevel.toLowerCase()}" title="Environmental & Operational Hazard Risk: ${hazardScore}/100 (${hazardLevel})">
+            <i class="fa-solid fa-triangle-exclamation"></i> HAZARD ${hazardScore}/100 <span class="score-level-badge">${hazardLevel}</span>
+          </span>
         </div>
+
         <div class="target-card-meta">
           <div class="meta-row">
-            <span>Confidence / Metric:</span>
-            <span class="mono">${conf}% (${lenM}m × ${widM}m)</span>
+            <span><i class="fa-solid fa-ruler-combined"></i> Physical Extent:</span>
+            <span class="mono">${lenM}m × ${widM}m (${areaM} m²)</span>
           </div>
           <div class="meta-row">
-            <span>Geospatial Datum:</span>
+            <span><i class="fa-solid fa-compass"></i> Geolocation:</span>
             <span class="mono">${geoLabel}</span>
           </div>
         </div>
+
+        <div class="target-card-footer">
+          <span class="tag-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
+          <button class="btn-why-score" data-target-id="${t.object_id}" title="Inspect explainable score breakdown">
+            <i class="fa-solid fa-circle-question"></i> Why this score?
+          </button>
+        </div>
       `;
+
+      const whyBtn = item.querySelector('.btn-why-score');
+      if (whyBtn) {
+        whyBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.onTargetSelected(t.object_id, { fly: true, force: true });
+          this.openScoreExplanationModal(t.object_id);
+        };
+      }
+
       container.appendChild(item);
     });
   }
@@ -682,7 +806,8 @@ class DashboardApp {
 
     const narrativeEl = document.getElementById('targetNarrative');
     if (narrativeEl) {
-      narrativeEl.textContent = target.explanation || `Target ${target.object_id} independently verified with high acoustic backscatter salience and shadow-relief correlation.`;
+      const narrative = (target.score_explanation && target.score_explanation.narrative) || target.explanation || `Target ${target.object_id} independently verified with high acoustic backscatter salience and shadow-relief correlation.`;
+      narrativeEl.textContent = narrative;
     }
 
     const statusTag = document.getElementById('explainabilityStatusTag');
@@ -692,10 +817,22 @@ class DashboardApp {
       statusTag.className = `panel-tag ${isConfirmed ? 'green' : 'amber'}`;
     }
 
+    const recEl = document.getElementById('targetActionRec');
+    if (recEl) {
+      const action = (target.score_explanation && target.score_explanation.action_recommendation) || target.action_recommendation || "Prioritize for ROV acoustic / optical inspection";
+      const prioLevel = (target.priority_level || 'HIGH').toLowerCase();
+      recEl.innerHTML = `<div class="action-rec-badge ${prioLevel}"><i class="fa-solid fa-clipboard-check"></i> ${action}</div>`;
+    }
+
     const physicsEl = document.getElementById('targetPhysicsDetails');
     if (physicsEl) {
       const srcCat = target.source_category || "BOTH";
       const qm = target.quality_metrics || {};
+      const prioScore = target.priority_score != null ? Math.round(target.priority_score) : 85;
+      const prioLevel = target.priority_level || 'HIGH';
+      const hazardScore = target.hazard_score != null ? Math.round(target.hazard_score) : 75;
+      const confScore = Math.round((target.calibrated_confidence || target.confidence || 0.85) * 100);
+
       physicsEl.innerHTML = `
         <div class="physics-grid">
           <div class="physics-cell">
@@ -703,20 +840,211 @@ class DashboardApp {
             <span class="p-val ${srcCat === 'BOTH' ? 'cyan' : (srcCat === 'UNET_ONLY' ? 'magenta' : 'orange')}">${srcCat}</span>
           </div>
           <div class="physics-cell">
-            <span class="p-lbl">VERIFY SCORE:</span>
-            <span class="p-val green">${target.verification_score || target.confidence || 0.88}</span>
+            <span class="p-lbl">AI CONFIDENCE:</span>
+            <span class="p-val green">${confScore}%</span>
           </div>
           <div class="physics-cell">
-            <span class="p-lbl">CONTRAST:</span>
-            <span class="p-val">${qm.contrast_score || '0.85'}</span>
+            <span class="p-lbl">HAZARD RISK:</span>
+            <span class="p-val orange">${hazardScore}/100</span>
           </div>
           <div class="physics-cell">
-            <span class="p-lbl">SHADOW RELIEF:</span>
-            <span class="p-val">${qm.shadow_score || '0.78'}</span>
+            <span class="p-lbl">PRIORITY SCORE:</span>
+            <span class="p-val cyan">${prioScore}/100 (${prioLevel})</span>
           </div>
         </div>
       `;
     }
+  }
+
+  openScoreExplanationModal(targetId) {
+    const target = this.targets.find(t => t.object_id === targetId) || (this.targets.length > 0 ? this.targets[0] : null);
+    if (!target) {
+      this.showToast({ type: "warning", title: "Target Not Found", message: `Target ${targetId} is not available.` });
+      return;
+    }
+
+    const modal = document.getElementById('scoreExplanationModal');
+    const content = document.getElementById('scoreExplanationContent');
+    if (!modal || !content) return;
+
+    const conf = Math.round((target.calibrated_confidence || target.confidence || 0.85) * 100);
+    const prioScore = target.priority_score != null ? Math.round(target.priority_score) : Math.round(conf * 0.95);
+    const prioLevel = (target.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+    
+    const hazardScore = target.hazard_score != null ? Math.round(target.hazard_score) : (target.risk_score === 'HIGH' ? 82 : 45);
+    const hazardLevel = (target.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+
+    const cleanClass = (target.class || 'marine_debris').replace(/_/g, ' ').toUpperCase();
+    const explanation = target.score_explanation || {};
+    const factors = explanation.factors_breakdown || {
+      ai_confidence: conf,
+      physical_extent: 70,
+      marine_hazard: 85,
+      location_sensitivity: 65,
+      sonar_reliability: 90
+    };
+
+    const reasons = explanation.reasons || [
+      `High intrinsic hazard debris class (${cleanClass}) posing marine entanglement and operational risk.`,
+      `Dual-path model agreement (YOLO bounding box + U-Net pixel segmentation).`,
+      `Acoustic shadow relief and backscatter verify high structural elevation on seabed.`,
+      `Physical extent meets significant hazard thresholds.`
+    ];
+
+    const actionRec = explanation.action_recommendation || target.action_recommendation || "Prioritize for immediate ROV intervention and tactical mission tracking.";
+    const narrative = explanation.narrative || target.explanation || `Target ${target.object_id} classified as ${cleanClass} with high operational priority. Intrinsic environmental risk is evaluated independently of acoustic survey conditions.`;
+
+    let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : null);
+    let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : null);
+    const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
+    const geoText = hasCoords ? `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E` : 'Case C (Unreferenced Sonar Chip)';
+
+    const lenM = target.length_m ? Math.round(target.length_m) : 18;
+    const widM = target.width_m ? Math.round(target.width_m) : 6;
+    const areaM = target.area_sq_m ? Math.round(target.area_sq_m) : (lenM * widM);
+
+    content.innerHTML = `
+      <!-- Header Info Banner -->
+      <div class="score-modal-banner">
+        <div class="score-banner-left">
+          <div class="score-target-title">
+            <span class="banner-id-chip">#${target.object_id}</span>
+            <span class="banner-target-name">${cleanClass}</span>
+          </div>
+          <div class="score-target-meta">
+            <span><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m (${areaM} m²)</span>
+            <span><i class="fa-solid fa-location-dot"></i> ${geoText}</span>
+            <span><i class="fa-solid fa-cubes"></i> ${target.source_category || 'YOLO + U-NET'}</span>
+          </div>
+        </div>
+        <div class="score-banner-badge-wrap">
+          <span class="priority-badge-lg ${prioLevel.toLowerCase()}">
+            <i class="fa-solid fa-bolt"></i> PRIORITY ${prioScore}/100 &mdash; ${prioLevel}
+          </span>
+        </div>
+      </div>
+
+      <!-- 3 Concepts Cards -->
+      <div class="score-concept-grid">
+        <div class="score-concept-card conf-card">
+          <div class="concept-card-top">
+            <span class="concept-icon"><i class="fa-solid fa-crosshairs"></i></span>
+            <span class="concept-label">AI DETECTION CONFIDENCE</span>
+          </div>
+          <div class="concept-value">${conf}%</div>
+          <div class="concept-sub">Certainty of Debris Existence</div>
+          <div class="concept-desc">Independent dual-model agreement (YOLO bounding box + U-Net pixel segmentation) with acoustic shadow verification.</div>
+        </div>
+
+        <div class="score-concept-card hazard-card ${hazardLevel.toLowerCase()}">
+          <div class="concept-card-top">
+            <span class="concept-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+            <span class="concept-label">ENVIRONMENTAL / HAZARD RISK</span>
+          </div>
+          <div class="concept-value">${hazardScore}<span class="max-denom">/100</span> &middot; <span class="val-level">${hazardLevel}</span></div>
+          <div class="concept-sub">Intrinsic Threat to Marine Habitat</div>
+          <div class="concept-desc">Harm potential based on debris taxonomy, physical seabed footprint, entanglement danger, and navigation obstruction.</div>
+        </div>
+
+        <div class="score-concept-card prio-card ${prioLevel.toLowerCase()}">
+          <div class="concept-card-top">
+            <span class="concept-icon"><i class="fa-solid fa-bolt"></i></span>
+            <span class="concept-label">INSPECTION PRIORITY SCORE</span>
+          </div>
+          <div class="concept-value">${prioScore}<span class="max-denom">/100</span> &middot; <span class="val-level">${prioLevel}</span></div>
+          <div class="concept-sub">Actionable Mission Sequence Score</div>
+          <div class="concept-desc">Operational dispatch priority fusing hazard danger, AI certainty, and location sensitivity modulated by sonar reliability.</div>
+        </div>
+      </div>
+
+      <!-- Contributing Factor Breakdown Progress Bars -->
+      <div class="score-factors-section">
+        <div class="score-sec-title"><i class="fa-solid fa-sliders"></i> Contributing Factor Breakdown</div>
+        <div class="factor-bars-grid">
+          <div class="factor-bar-item">
+            <div class="factor-bar-header">
+              <span><i class="fa-solid fa-crosshairs"></i> AI Detection Confidence</span>
+              <span class="factor-val-num">${factors.ai_confidence}%</span>
+            </div>
+            <div class="factor-bar-track">
+              <div class="factor-bar-fill conf" style="width: ${factors.ai_confidence}%;"></div>
+            </div>
+          </div>
+
+          <div class="factor-bar-item">
+            <div class="factor-bar-header">
+              <span><i class="fa-solid fa-ruler"></i> Physical Extent / Area</span>
+              <span class="factor-val-num">${factors.physical_extent}/100</span>
+            </div>
+            <div class="factor-bar-track">
+              <div class="factor-bar-fill extent" style="width: ${factors.physical_extent}%;"></div>
+            </div>
+          </div>
+
+          <div class="factor-bar-item">
+            <div class="factor-bar-header">
+              <span><i class="fa-solid fa-triangle-exclamation"></i> Marine & Operational Hazard</span>
+              <span class="factor-val-num">${factors.marine_hazard}/100</span>
+            </div>
+            <div class="factor-bar-track">
+              <div class="factor-bar-fill hazard" style="width: ${factors.marine_hazard}%;"></div>
+            </div>
+          </div>
+
+          <div class="factor-bar-item">
+            <div class="factor-bar-header">
+              <span><i class="fa-solid fa-location-dot"></i> Location & Ecosystem Sensitivity</span>
+              <span class="factor-val-num">${factors.location_sensitivity}/100</span>
+            </div>
+            <div class="factor-bar-track">
+              <div class="factor-bar-fill loc" style="width: ${factors.location_sensitivity}%;"></div>
+            </div>
+          </div>
+
+          <div class="factor-bar-item">
+            <div class="factor-bar-header">
+              <span><i class="fa-solid fa-wave-square"></i> Sonar Quality & Reliability</span>
+              <span class="factor-val-num">${factors.sonar_reliability}%</span>
+            </div>
+            <div class="factor-bar-track">
+              <div class="factor-bar-fill sonar" style="width: ${factors.sonar_reliability}%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Natural Language Narrative & Supported Reasons -->
+      <div class="score-narrative-section">
+        <div class="score-sec-title"><i class="fa-solid fa-quote-left"></i> Explainable Decision Narrative</div>
+        <div class="narrative-box">
+          <p>${narrative}</p>
+        </div>
+
+        <div class="score-sec-title" style="margin-top: 18px;"><i class="fa-solid fa-list-check"></i> Key Contributing Evidence Checklist</div>
+        <div class="reasons-checklist">
+          ${reasons.map(r => `
+            <div class="reason-check-item">
+              <span class="check-icon"><i class="fa-solid fa-check"></i></span>
+              <span class="check-text">${r}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Operational Action Recommendation -->
+      <div class="score-action-section">
+        <div class="score-sec-title"><i class="fa-solid fa-clipboard-check"></i> Operational Action Recommendation</div>
+        <div class="score-action-card ${prioLevel.toLowerCase()}">
+          <i class="fa-solid fa-circle-exclamation action-icon"></i>
+          <div>
+            <div class="action-heading">RECOMMENDED OPERATIONAL RESPONSE:</div>
+            <div class="action-body">${actionRec}</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
   }
 
   async openAblationModal() {
@@ -1064,6 +1392,42 @@ class DashboardApp {
       };
     }
 
+    // Target Sorting Dropdown
+    const targetSortSelect = document.getElementById('targetSortSelect');
+    if (targetSortSelect) {
+      targetSortSelect.value = this.currentSort;
+      targetSortSelect.addEventListener('change', (e) => {
+        this.currentSort = e.target.value;
+        this.renderTargetList();
+      });
+    }
+
+    // Score Explanation Modal Close Listeners
+    const scoreModal = document.getElementById('scoreExplanationModal');
+    const btnCloseScore = document.getElementById('btnCloseScoreModal');
+    if (btnCloseScore && scoreModal) {
+      btnCloseScore.onclick = () => {
+        scoreModal.style.display = 'none';
+      };
+    }
+    if (scoreModal) {
+      scoreModal.addEventListener('click', (e) => {
+        if (e.target === scoreModal) {
+          scoreModal.style.display = 'none';
+        }
+      });
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const sm = document.getElementById('scoreExplanationModal');
+        if (sm && sm.style.display === 'flex') sm.style.display = 'none';
+        const am = document.getElementById('ablationStudyModal');
+        if (am && am.style.display === 'flex') am.style.display = 'none';
+        const rm = document.getElementById('missionReportModal');
+        if (rm && rm.style.display === 'flex') rm.style.display = 'none';
+      }
+    });
+
     // Swath toggle button
     const btnToggleSwath = document.getElementById('btnToggleSwath');
     if (btnToggleSwath) {
@@ -1130,10 +1494,20 @@ class DashboardApp {
       const vStatus = (d.verification_status || 'confirmed').toUpperCase();
       const qm = d.quality_metrics || {};
 
+      const prioScore = d.priority_score != null ? Math.round(d.priority_score) : Math.round(conf * 0.95);
+      const prioLevel = (d.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+      const hazardScore = d.hazard_score != null ? Math.round(d.hazard_score) : (risk === 'HIGH' ? 82 : 45);
+      const hazardLevel = (d.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
+
       tableRows += `
         <tr>
           <td><b style="color:var(--cyan-beam); font-family:var(--font-mono);">#${idx + 1} ${d.object_id}</b></td>
           <td><b>${cleanClass}</b></td>
+          <td>
+            <span class="score-pill prio-${prioLevel.toLowerCase()}" style="padding: 2px 8px; font-size: 0.72rem;">
+              <b>${prioScore}/100</b> (${prioLevel})
+            </span>
+          </td>
           <td>
             <div class="accuracy-bar-wrap">
               <span class="mono" style="font-weight:700; color:#ffffff;">${conf}%</span>
@@ -1142,11 +1516,15 @@ class DashboardApp {
               </div>
             </div>
           </td>
+          <td>
+            <span class="score-pill hazard-${hazardLevel.toLowerCase()}" style="padding: 2px 8px; font-size: 0.72rem;">
+              <b>${hazardScore}/100</b> (${hazardLevel})
+            </span>
+          </td>
           <td><span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span></td>
           <td><span style="color:${vStatus === 'CONFIRMED' ? 'var(--emerald-safe)' : 'var(--amber-warn)'}; font-weight:700;">${vStatus}</span></td>
           <td><span class="mono" style="color:#e2e8f0;">${geoText}</span></td>
           <td><span class="mono">${lenM}m × ${widM}m (${areaM} m²)</span></td>
-          <td><span class="hazard-badge ${risk}">${risk}</span></td>
         </tr>
       `;
 
@@ -1156,13 +1534,26 @@ class DashboardApp {
             <span class="report-dossier-title">#${idx + 1} ${d.object_id} &mdash; ${cleanClass}</span>
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span>
-              <span class="hazard-badge ${risk}">${risk} RISK</span>
+              <span class="priority-badge ${prioLevel.toLowerCase()}">PRIORITY: ${prioScore}/100</span>
+              <span class="hazard-badge ${hazardLevel.toLowerCase()}">HAZARD: ${hazardScore}/100</span>
             </div>
           </div>
           <div style="font-size: 0.80rem; color: #d1e2f5; line-height: 1.45; margin-top: 4px;">
-            ${d.explanation || `Target ${d.object_id} validated via parallel dual-path AI inference with acoustic backscatter salience and shadow-relief correlation.`}
+            ${(d.score_explanation && d.score_explanation.narrative) || d.explanation || `Target ${d.object_id} validated via parallel dual-path AI inference with acoustic backscatter salience and shadow-relief correlation.`}
           </div>
           <div class="report-metric-pill-row">
+            <div class="report-metric-pill">
+              <span class="report-metric-lbl">INSPECTION PRIORITY</span>
+              <span class="report-metric-val" style="color:var(--cyan-beam); font-weight:800;">${prioScore}/100 (${prioLevel})</span>
+            </div>
+            <div class="report-metric-pill">
+              <span class="report-metric-lbl">AI DETECTION CONF</span>
+              <span class="report-metric-val" style="color:var(--emerald-safe);">${conf}%</span>
+            </div>
+            <div class="report-metric-pill">
+              <span class="report-metric-lbl">HAZARD RISK</span>
+              <span class="report-metric-val" style="color:var(--coral-danger);">${hazardScore}/100 (${hazardLevel})</span>
+            </div>
             <div class="report-metric-pill">
               <span class="report-metric-lbl">GEOLOCATION</span>
               <span class="report-metric-val" style="color:var(--cyan-beam); font-size:0.68rem;">${geoText}</span>
@@ -1172,20 +1563,8 @@ class DashboardApp {
               <span class="report-metric-val">${lenM}m × ${widM}m (${areaM} m²)</span>
             </div>
             <div class="report-metric-pill">
-              <span class="report-metric-lbl">CONFIDENCE / RECALL</span>
-              <span class="report-metric-val" style="color:var(--emerald-safe);">${conf}% Calibrated</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">VERIFICATION SCORE</span>
+              <span class="report-metric-lbl">VERIFY SCORE</span>
               <span class="report-metric-val">${(d.verification_score || d.confidence || 0.88).toFixed(2)}</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">CONTRAST SALIENCE</span>
-              <span class="report-metric-val">${qm.contrast_score || '0.85'}</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">SHADOW RELIEF</span>
-              <span class="report-metric-val">${qm.shadow_score || '0.78'}</span>
             </div>
           </div>
         </div>
@@ -1262,18 +1641,20 @@ class DashboardApp {
             <tr>
               <th>Target ID</th>
               <th>Debris Taxonomy</th>
-              <th>Calibrated Accuracy</th>
+              <th>Inspection Priority</th>
+              <th>AI Confidence</th>
+              <th>Hazard Risk</th>
               <th>Dual Provenance</th>
               <th>Acoustic Status</th>
               <th>WGS84 Coordinates</th>
               <th>Physical Dimensions</th>
-              <th>Hazard Risk</th>
             </tr>
           </thead>
           <tbody>
-            ${tableRows || '<tr><td colspan="8" style="text-align:center; padding:20px;">No debris targets detected.</td></tr>'}
+            ${tableRows || '<tr><td colspan="9" style="text-align:center; padding:20px;">No debris targets detected.</td></tr>'}
           </tbody>
         </table>
+      </div>
       </div>
 
       <!-- 4. Individual Target Detailed Intelligence Dossiers -->
