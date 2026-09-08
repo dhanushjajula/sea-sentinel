@@ -129,6 +129,9 @@ class DashboardApp {
 
   async loadSampleCatalog() {
     this.samples = await window.apiService.fetchSamples();
+    if (this.samples && this.samples.length > 0) {
+      this.currentSample = this.samples[0];
+    }
     const container = document.getElementById('sampleChipsContainer');
     if (!container) return;
 
@@ -1164,10 +1167,15 @@ class DashboardApp {
     const widM = spatial.max_width_m || bestTarget.width_m || "8789";
     const areaM = spatial.total_area_sq_m || bestTarget.area_sq_m || "Estimated";
 
-    // Sonar preview
-    const rawImg = (this.currentAnalysisResult && this.currentAnalysisResult.raw_image_url)
-      ? `${window.apiService.baseUrl}${this.currentAnalysisResult.raw_image_url}`
-      : (this.currentSample && this.currentSample.path ? `${window.apiService.baseUrl}/api/image?path=${encodeURIComponent(this.currentSample.path)}` : 'css/sonar_placeholder.png');
+    // Sonar preview (instant preloaded rasters)
+    let rawImg = 'css/sonar_placeholder.png';
+    if (this.currentAnalysisResult && this.currentAnalysisResult.raw_image_url) {
+      rawImg = `${window.apiService.baseUrl}${this.currentAnalysisResult.raw_image_url}`;
+    } else if (this.waterfall && this.waterfall.rawImage && this.waterfall.rawImage.src) {
+      rawImg = this.waterfall.rawImage.src;
+    } else if (this.currentSample && this.currentSample.path) {
+      rawImg = `${window.apiService.baseUrl}/api/image?path=${encodeURIComponent(this.currentSample.path)}`;
+    }
 
     const annotImg = (this.currentAnalysisResult && this.currentAnalysisResult.annotated_image_url)
       ? `${window.apiService.baseUrl}${this.currentAnalysisResult.annotated_image_url}`
@@ -1272,11 +1280,11 @@ class DashboardApp {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div style="background:#020712; border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow:hidden; text-align:center;">
             <div style="padding:4px 8px; font-size:0.7rem; color:#8da2be; background:rgba(0,0,0,0.5);">INPUT ACOUSTIC RASTER</div>
-            <img src="${rawImg}" alt="Raw Sonar" style="max-height:160px; max-width:100%; object-fit:contain;" />
+            <img src="${rawImg}" alt="Raw Sonar" loading="eager" decoding="sync" style="max-height:160px; max-width:100%; object-fit:contain; display:block; margin:0 auto;" />
           </div>
           <div style="background:#020712; border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow:hidden; text-align:center;">
             <div style="padding:4px 8px; font-size:0.7rem; color:var(--cyan-beam); background:rgba(0,0,0,0.5);">AI ANNOTATED DETECTIONS & MASKS</div>
-            <img src="${annotImg}" alt="Annotated Sonar" style="max-height:160px; max-width:100%; object-fit:contain;" />
+            <img src="${annotImg}" alt="Annotated Sonar" loading="eager" decoding="sync" style="max-height:160px; max-width:100%; object-fit:contain; display:block; margin:0 auto;" />
           </div>
         </div>
       </div>

@@ -222,6 +222,13 @@ def get_image_file(path: str = Query(...)):
     # If the image is a TIFF/GeoTIFF, modern web browsers cannot render it natively.
     # Convert on-the-fly to a standard PNG stream for instant high-quality browser rendering.
     if ext in [".tif", ".tiff"]:
+        import hashlib
+        mtime = os.path.getmtime(real_path)
+        cache_key = hashlib.md5(f"{real_path}_{mtime}".encode()).hexdigest()
+        cached_png = os.path.join(PREPROCESSED_DIR, f"cached_tiff_{cache_key}.png")
+        if os.path.exists(cached_png):
+            return FileResponse(cached_png, media_type="image/png")
+
         img = None
         try:
             img = cv2.imread(real_path, cv2.IMREAD_UNCHANGED)
@@ -245,9 +252,13 @@ def get_image_file(path: str = Query(...)):
         if img is not None:
             if img.dtype != np.uint8:
                 img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-            success, encoded = cv2.imencode(".png", img)
-            if success:
-                return Response(content=encoded.tobytes(), media_type="image/png")
+            try:
+                cv2.imwrite(cached_png, img)
+                return FileResponse(cached_png, media_type="image/png")
+            except Exception:
+                success, encoded = cv2.imencode(".png", img)
+                if success:
+                    return Response(content=encoded.tobytes(), media_type="image/png")
 
     media_types = {
         ".jpg": "image/jpeg",
@@ -326,7 +337,11 @@ def analyze_survey(req: AnalyzeRequest):
 
     # Attach convenient relative URLs for frontend display
     analysis_id = res.get("analysis_id", "")
-    res["raw_image_url"] = f"/api/image?path={os.path.abspath(req.image_path)}"
+    raw_p = res.get("raw_image_path")
+    if raw_p and os.path.exists(raw_p):
+        res["raw_image_url"] = f"/static/preprocessed/{os.path.basename(raw_p)}"
+    else:
+        res["raw_image_url"] = f"/api/image?path={os.path.abspath(req.image_path)}"
     
     enhanced_p = res.get("enhanced_image_path")
     if enhanced_p and os.path.exists(enhanced_p):

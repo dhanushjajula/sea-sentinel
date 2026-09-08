@@ -512,12 +512,20 @@ class SIHPipelineAgent:
         }
 
         # -------------------------------------------------------------
-        # Save Enhanced & Annotated Sonar Preview Rasters
+        # Save Raw, Enhanced & Annotated Sonar Preview Rasters
         # -------------------------------------------------------------
         output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs", "preprocessed")
         os.makedirs(output_dir, exist_ok=True)
+        raw_path = os.path.join(output_dir, f"{analysis_id}_raw.png")
         enhanced_path = os.path.join(output_dir, f"{analysis_id}_enhanced.png")
         annotated_path = os.path.join(output_dir, f"{analysis_id}_annotated.png")
+
+        # Save raw normalized preview raster for instantaneous report and UI loading
+        if raw_img is not None and isinstance(raw_img, np.ndarray):
+            raw_to_save = raw_img
+            if raw_to_save.dtype != np.uint8:
+                raw_to_save = cv2.normalize(raw_to_save, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+            cv2.imwrite(raw_path, raw_to_save)
 
         enhanced_img = prep_res.get("preprocessed_image")
         if enhanced_img is not None and isinstance(enhanced_img, np.ndarray):
@@ -670,6 +678,7 @@ class SIHPipelineAgent:
             "analysis_id": analysis_id,
             "status": "success",
             "image_path": image_path,
+            "raw_image_path": raw_path if os.path.exists(raw_path) else None,
             "enhanced_image_path": enhanced_path if os.path.exists(enhanced_path) else None,
             "annotated_image_path": annotated_path if os.path.exists(annotated_path) else None,
             "georeferencing_case": georef_case,
