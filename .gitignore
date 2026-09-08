@@ -37,6 +37,8 @@ datasets/raw/*
 !datasets/raw/.gitkeep
 *.tif
 *.tiff
+!backend/datasets/samples/*.tif
+!backend/datasets/samples/*.tiff
 *.zip
 *.parquet
 **/models/checkpoints/*.pt

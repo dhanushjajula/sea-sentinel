@@ -265,34 +265,17 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         t0 = time.perf_counter()
         raster_meta = raster_meta_override or self.geotagger.read_raster_metadata(image_path)
-        georef_case = self.geotagger.classify_georef_case(raster_meta)
+        active_nav_log = nav_log or raster_meta.get("nav_log")
+        georef_case = self.geotagger.classify_georef_case(raster_meta, nav_log=active_nav_log)
         t_geo = round((time.perf_counter() - t0) * 1000, 2)
-
-        # Benchmark Hydrographic Survey Logs for curated missions (Albany / Hudson River corridor, WGS84)
-        BENCHMARK_SURVEY_LOGS = {
-            "quanzhou_hn_004": {"latitude": 42.747402, "longitude": -73.794567, "heading": 15.0, "altitude_m": 12.0},
-            "dongying_poc_017": {"latitude": 42.748950, "longitude": -73.792840, "heading": 25.0, "altitude_m": 14.0},
-            "quanzhou_rp_002": {"latitude": 42.746120, "longitude": -73.796100, "heading": 350.0, "altitude_m": 10.0},
-            "dongying_ep_008": {"latitude": 42.745500, "longitude": -73.791500, "heading": 45.0, "altitude_m": 15.0},
-        }
-
-        active_nav_log = nav_log
-        if not active_nav_log:
-            fname_key = os.path.splitext(os.path.basename(image_path).lower())[0]
-            for b_key, b_val in BENCHMARK_SURVEY_LOGS.items():
-                if b_key in fname_key:
-                    active_nav_log = b_val
-                    break
-            if not active_nav_log and georef_case != "A":
-                # Default to Active Hydrographic Survey Deployment Datum (Hudson River / Albany sector, WGS84)
-                active_nav_log = {"latitude": 42.747402, "longitude": -73.794567, "heading": 15.0, "altitude_m": 12.0}
 
         execution_trace.append({
             "stage": "georeference_check",
             "status": "completed",
             "duration_ms": t_geo,
             "case": georef_case,
-            "crs": raster_meta.get("crs")
+            "crs": raster_meta.get("crs"),
+            "dataset_profile": raster_meta.get("dataset_profile")
         })
 
         # -------------------------------------------------------------
@@ -337,7 +320,7 @@ class SIHPipelineAgent:
             t_g0 = time.perf_counter()
             lat, lon = None, None
             effective_case = georef_case
-            uncertainty_m = 1.5
+            uncertainty_m = None
 
             scale_f = img_meta.get("scale_factor", 1.0)
             full_bbox = {
@@ -351,17 +334,26 @@ class SIHPipelineAgent:
             if georef_case == "A":
                 x_map, y_map = self.geotagger.locate_case_a(center, raster_meta)
                 lat, lon = self.geotagger.to_lat_lon(x_map, y_map, raster_meta.get("crs"))
-                uncertainty_m = 1.5
+                res_m = max(raster_meta.get("res", (1.0, 1.0)))
+                uncertainty_m = round(res_m * 1.5, 2)
+                if lat is None or lon is None:
+                    effective_case = "C"
+                    uncertainty_m = None
             elif active_nav_log:
                 # Case B / Towfish Navigation Dead-Reckoning projection from Nadir Trackline
                 lat, lon, uncertainty_m = self.geotagger.locate_case_b(
                     pixel_center=center,
                     waterfall_dims=(h_raw, w_raw),
                     nav_log=active_nav_log,
-                    slant_range_m=75.0,
+                    slant_range_m=float(active_nav_log.get("slant_range_m", 75.0)),
                     altitude_m=active_nav_log.get("altitude_m", 12.0)
                 )
                 effective_case = "B"
+            else:
+                # Case C: Unreferenced image chip (strictly withhold coordinates)
+                effective_case = "C"
+                lat, lon, uncertainty_m = None, None, None
+
             t_geo_total += (time.perf_counter() - t_g0)
 
             # 6e: Multi-Factor Risk Assessment
@@ -392,18 +384,22 @@ class SIHPipelineAgent:
                 length_m=dims.get("length_m"),
                 width_m=dims.get("width_m"),
                 case=effective_case,
-                uncertainty_m=uncertainty_m
+                uncertainty_m=uncertainty_m or 0.0
             )
 
             # Ensure coordinates and georeferencing status are populated for GIS mapping
-            rec["coordinates_available"] = (lat is not None and lon is not None)
+            has_valid_coords = (lat is not None and lon is not None)
+            rec["coordinates_available"] = has_valid_coords
             rec["latitude"] = lat
             rec["longitude"] = lon
             rec["lat"] = lat
             rec["lon"] = lon
-            rec["coordinate_system"] = "WGS84 (EPSG:4326)" if lat is not None else "UNREFERENCED"
+            rec["coordinate_system"] = (
+                raster_meta.get("crs") or "WGS84 (EPSG:4326)"
+            ) if has_valid_coords else "UNREFERENCED"
             rec["georeferencing_case"] = effective_case
-            rec["position_uncertainty_m"] = uncertainty_m
+            rec["position_uncertainty_m"] = uncertainty_m if has_valid_coords else None
+            rec["dataset_profile"] = raster_meta.get("dataset_profile")
 
             # Normalized bounding box for responsive client-side scaling
             w_img = max(1, w_raw)
@@ -601,29 +597,56 @@ class SIHPipelineAgent:
             lats = [o["latitude"] for o in final_objects if o.get("latitude") is not None]
             lons = [o["longitude"] for o in final_objects if o.get("longitude") is not None]
             
-            spatial_summary = {
-                "latitude": round(sum(lats) / len(lats), 6) if lats else None,
-                "longitude": round(sum(lons) / len(lons), 6) if lons else None,
-                "min_lat": min(lats) if lats else None,
-                "max_lat": max(lats) if lats else None,
-                "min_lon": min(lons) if lons else None,
-                "max_lon": max(lons) if lons else None,
-                "georeferenced": len(lats) > 0,
-                "coordinate_system": "WGS84 (EPSG:4326)" if lats else "UNREFERENCED",
-                "total_area_sq_m": round(sum((o.get("area_sq_m") or 0.0) for o in final_objects), 2),
-                "max_length_m": round(max(((o.get("length_m") or 0.0) for o in final_objects), default=0.0), 2),
-                "max_width_m": round(max(((o.get("width_m") or 0.0) for o in final_objects), default=0.0), 2),
-            }
+            has_geo = (len(lats) > 0 and len(lons) > 0)
+            if has_geo:
+                spatial_summary = {
+                    "latitude": round(sum(lats) / len(lats), 6),
+                    "longitude": round(sum(lons) / len(lons), 6),
+                    "min_lat": min(lats),
+                    "max_lat": max(lats),
+                    "min_lon": min(lons),
+                    "max_lon": max(lons),
+                    "georeferenced": True,
+                    "coordinate_system": raster_meta.get("crs") or "WGS84 (EPSG:4326)",
+                    "georeferencing_case": georef_case,
+                    "dataset_profile": raster_meta.get("dataset_profile") or "Georeferenced Sonar Mosaic",
+                    "bbox_wgs84": raster_meta.get("bbox_wgs84"),
+                    "center_wgs84": raster_meta.get("center_wgs84"),
+                    "total_area_sq_m": round(sum((o.get("area_sq_m") or 0.0) for o in final_objects), 2),
+                    "max_length_m": round(max(((o.get("length_m") or 0.0) for o in final_objects), default=0.0), 2),
+                    "max_width_m": round(max(((o.get("width_m") or 0.0) for o in final_objects), default=0.0), 2),
+                }
+            else:
+                spatial_summary = {
+                    "latitude": None,
+                    "longitude": None,
+                    "georeferenced": False,
+                    "coordinate_system": "UNREFERENCED",
+                    "georeferencing_case": "C",
+                    "dataset_profile": raster_meta.get("dataset_profile") or "Unreferenced Acoustic Chip (Case C)",
+                    "notice": "Unreferenced acoustic image chip. No GeoTIFF tags or navigation telemetry found in dataset; synthetic coordinates are strictly suppressed.",
+                    "bbox_wgs84": None,
+                    "center_wgs84": None,
+                    "total_area_sq_m": round(sum((o.get("area_sq_m") or 0.0) for o in final_objects), 2) if final_objects else 0.0,
+                    "max_length_m": 0.0,
+                    "max_width_m": 0.0,
+                }
             class_breakdown = best_obj.get("all_detected_classes", [])
         else:
             overall_class = "unclassified_seabed"
             overall_conf = 0.0
             overall_prio = "LOWER"
+            has_raster_geo = raster_meta.get("georeferenced", False)
             spatial_summary = {
-                "latitude": None,
-                "longitude": None,
-                "georeferenced": False,
-                "coordinate_system": "UNREFERENCED",
+                "latitude": raster_meta.get("center_wgs84", {}).get("lat") if has_raster_geo else None,
+                "longitude": raster_meta.get("center_wgs84", {}).get("lon") if has_raster_geo else None,
+                "georeferenced": has_raster_geo,
+                "coordinate_system": (raster_meta.get("crs") or "UNREFERENCED") if has_raster_geo else "UNREFERENCED",
+                "georeferencing_case": georef_case,
+                "dataset_profile": raster_meta.get("dataset_profile") or "Unreferenced Acoustic Chip (Case C)",
+                "notice": "No debris targets detected. Survey extent is georeferenced." if has_raster_geo else "No targets detected. Synthetic coordinates are suppressed.",
+                "bbox_wgs84": raster_meta.get("bbox_wgs84"),
+                "center_wgs84": raster_meta.get("center_wgs84"),
                 "total_area_sq_m": 0.0,
                 "max_length_m": 0.0,
                 "max_width_m": 0.0
@@ -640,6 +663,9 @@ class SIHPipelineAgent:
             "candidate_classes_breakdown": class_breakdown
         }
 
+        # Update stats
+        stats["georeferenced_targets"] = sum(1 for d in final_objects if d.get("latitude") is not None)
+
         return {
             "analysis_id": analysis_id,
             "status": "success",
@@ -647,6 +673,9 @@ class SIHPipelineAgent:
             "enhanced_image_path": enhanced_path if os.path.exists(enhanced_path) else None,
             "annotated_image_path": annotated_path if os.path.exists(annotated_path) else None,
             "georeferencing_case": georef_case,
+            "dataset_profile": raster_meta.get("dataset_profile"),
+            "bbox_wgs84": raster_meta.get("bbox_wgs84"),
+            "center_wgs84": raster_meta.get("center_wgs84"),
             "total_detections": len(final_objects),
             "summary_statistics": stats,
             "report_summary": report_summary,

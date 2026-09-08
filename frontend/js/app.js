@@ -139,12 +139,21 @@ class DashboardApp {
       btn.dataset.sampleId = s.id;
 
       let icon = "fa-network-wired";
-      if (s.category === "pipeline_or_cable") icon = "fa-bolt";
+      if (s.category === "georeferenced_mosaic") icon = "fa-map-location-dot";
+      else if (s.category === "pipeline_or_cable") icon = "fa-bolt";
       else if (s.category === "riprap_debris") icon = "fa-mountain";
       else if (s.category === "engine_debris" || s.category === "engine_part") icon = "fa-gears";
       else if (s.category === "shipwreck_fragment") icon = "fa-ship";
+      else if (s.category === "sonar_waterfall") icon = "fa-water";
 
-      btn.innerHTML = `<i class="fa-solid ${icon}"></i> ${s.name.split(' ')[0]} ${s.name.split(' ')[1] || ''}`;
+      let caseBadge = `<span class="pill-badge case-c">Case C (Unref)</span>`;
+      if (s.georef_case === "A") {
+        caseBadge = `<span class="pill-badge case-a">GeoTIFF (Case A)</span>`;
+      } else if (s.georef_case === "B") {
+        caseBadge = `<span class="pill-badge case-b">Nav Log (Case B)</span>`;
+      }
+
+      btn.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${s.name}</span> ${caseBadge}`;
       btn.title = s.description || s.name;
       btn.onclick = (e) => {
         e.stopPropagation();
@@ -530,8 +539,12 @@ class DashboardApp {
     this.waterfall.setTargets(this.targets);
 
     const surveyMeta = {
-      heading: (result.nav_log && result.nav_log.heading) || 15.0,
-      altitude_m: (result.nav_log && result.nav_log.altitude_m) || 12.0
+      heading: (result.nav_log && result.nav_log.heading) || 85.0,
+      altitude_m: (result.nav_log && result.nav_log.altitude_m) || 12.0,
+      dataset_profile: result.dataset_profile,
+      bbox_wgs84: result.bbox_wgs84,
+      center_wgs84: result.center_wgs84,
+      georeferencing_case: result.georeferencing_case
     };
     this.map.setTargets(this.targets, surveyMeta);
 
@@ -705,8 +718,7 @@ class DashboardApp {
 
       let lat = (t.latitude != null) ? Number(t.latitude) : (t.lat != null ? Number(t.lat) : (t.simulated_coords ? Number(t.simulated_coords.lat) : (t.coordinates ? Number(t.coordinates.lat) : null)));
       let lon = (t.longitude != null) ? Number(t.longitude) : (t.lon != null ? Number(t.lon) : (t.simulated_coords ? Number(t.simulated_coords.lon) : (t.coordinates ? Number(t.coordinates.lon) : null)));
-      if (lat == null && idx === 0) lat = 42.74740;
-      if (lon == null && idx === 0) lon = -73.79457;
+      const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
 
       const formatDeg = (num, isLat) => {
         if (num == null || isNaN(num)) return "--";
@@ -715,8 +727,7 @@ class DashboardApp {
         return `${val}°${dir}`;
       };
 
-      const latVal = formatDeg(lat, true);
-      const lonVal = formatDeg(lon, false);
+      const geoLabel = hasCoords ? `<i class="fa-solid fa-location-dot"></i> ${formatDeg(lat, true)}, ${formatDeg(lon, false)}` : `<span style="color:#94a3b8; font-weight:600;"><i class="fa-solid fa-ban"></i> UNREFERENCED (Case C)</span>`;
       const lenM = t.length_m ? Math.round(t.length_m) : (idx === 0 ? 28 : 14);
       const widM = t.width_m ? Math.round(t.width_m) : (idx === 0 ? 9 : 3);
       const accStr = (Math.min(98.8, conf * 0.98 + 1.4)).toFixed(1);
@@ -751,7 +762,7 @@ class DashboardApp {
           </div>
         </div>
         <div class="target-card-geo">
-          <div><i class="fa-solid fa-location-dot"></i> ${latVal}, ${lonVal}</div>
+          <div>${geoLabel}</div>
           <div><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m</div>
         </div>
       `;
@@ -773,33 +784,59 @@ class DashboardApp {
       return;
     }
     this.selectedTargetId = targetId;
+    
+    // Synchronize Target List active styling
+    document.querySelectorAll('.target-card').forEach(el => {
+      const idEl = el.querySelector('.target-id');
+      el.classList.toggle('active', idEl && idEl.textContent.trim() === targetId);
+    });
+
+    // Notify Waterfall Overlay & Map
+    if (this.waterfall) this.waterfall.highlightTarget(targetId);
+    if (this.map && options.fly !== false) this.map.highlightTarget(targetId);
+
+    // Update Bottom Inspector Drawer
     const target = this.targets.find(t => t.object_id === targetId);
     if (!target) return;
 
-    if (this.waterfall) {
-      this.waterfall.selectTarget(targetId);
+    // ... (rest of the inspector logic implementation with geoChipHtml as specified in instruction)
+    const formatDeg = (num, isLat) => {
+      if (num == null || isNaN(num)) return "--";
+      const val = Math.abs(Number(num)).toFixed(5);
+      const dir = isLat ? (num >= 0 ? 'N' : 'S') : (num >= 0 ? 'E' : 'W');
+      return `${val}°${dir}`;
+    };
+
+    let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : (target.simulated_coords ? Number(target.simulated_coords.lat) : (target.coordinates ? Number(target.coordinates.lat) : null)));
+    let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : (target.simulated_coords ? Number(target.simulated_coords.lon) : (target.coordinates ? Number(target.coordinates.lon) : null)));
+    const hasTargetCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
+
+    const lenM = target.length_m ? Math.round(target.length_m) : 28;
+    const widM = target.width_m ? Math.round(target.width_m) : 9;
+
+    let geoChipHtml = "";
+    if (hasTargetCoords) {
+      const coordsStr = `${formatDeg(lat, true)}, ${formatDeg(lon, false)}`;
+      const georefCase = target.georeferencing_case ? `Case ${target.georeferencing_case}` : "Case A";
+      geoChipHtml = `
+        <div class="physics-chip full-width" style="cursor: pointer;" id="chipCoordsLocate" title="Click to focus target on GIS Map">
+          <span class="chip-lbl">GEOLOCATION (${georefCase}) & EXTENT (CLICK TO VIEW ON MAP)</span>
+          <span class="chip-val mono" style="color:#38bdf8;"><i class="fa-solid fa-map-location-dot"></i> ${coordsStr} &nbsp;|&nbsp; ${lenM}m (L) × ${widM}m (W)</span>
+        </div>
+      `;
+    } else {
+      geoChipHtml = `
+        <div class="physics-chip full-width unreferenced" title="No spatial metadata available in dataset. Random coordinates are strictly suppressed per hydrographic standards.">
+          <span class="chip-lbl">GEOLOCATION STATUS (CASE C UNREFERENCED)</span>
+          <span class="chip-val mono" style="color:#94a3b8;"><i class="fa-solid fa-ban"></i> UNREFERENCED (Coordinates Withheld) &nbsp;|&nbsp; ${lenM}m (L) × ${widM}m (W)</span>
+        </div>
+      `;
     }
 
-    if (options.fly && this.map) {
-      this.map.flyToTarget(targetId);
-    } else if (this.map) {
-      this.map.highlightTarget(targetId);
-    }
-
-    document.querySelectorAll('.target-card').forEach(el => {
-      const idEl = el.querySelector('.target-id');
-      if (idEl && idEl.textContent.trim() === targetId) {
-        el.classList.add('active');
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      } else {
-        el.classList.remove('active');
-      }
-    });
-
-    this.renderTargetNarrative(target);
+    this.renderTargetNarrative(target, geoChipHtml);
   }
 
-  renderTargetNarrative(target) {
+  renderTargetNarrative(target, geoChipHtml) {
     const narrativeEl = document.getElementById('targetNarrative');
     const recEl = document.getElementById('targetActionRec');
     const physicsEl = document.getElementById('targetPhysicsDetails');
@@ -824,21 +861,6 @@ class DashboardApp {
     const shadowIcon = target.shadow_verified ? "fa-circle-check" : "fa-circle-question";
     const mseVal = target.reconstruction_error ? target.reconstruction_error.toFixed(4) : "0.0412";
 
-    let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : (target.simulated_coords ? Number(target.simulated_coords.lat) : (target.coordinates ? Number(target.coordinates.lat) : null)));
-    let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : (target.simulated_coords ? Number(target.simulated_coords.lon) : (target.coordinates ? Number(target.coordinates.lon) : null)));
-    if (lat == null) lat = 42.74740;
-    if (lon == null) lon = -73.79457;
-
-    const formatDeg = (num, isLat) => {
-      if (num == null || isNaN(num)) return "--";
-      const val = Math.abs(Number(num)).toFixed(5);
-      const dir = isLat ? (num >= 0 ? 'N' : 'S') : (num >= 0 ? 'E' : 'W');
-      return `${val}°${dir}`;
-    };
-    const coordsStr = `${formatDeg(lat, true)}, ${formatDeg(lon, false)}`;
-    const lenM = target.length_m ? Math.round(target.length_m) : 28;
-    const widM = target.width_m ? Math.round(target.width_m) : 9;
-
     if (physicsEl) {
       physicsEl.innerHTML = `
         <div class="physics-grid">
@@ -858,10 +880,7 @@ class DashboardApp {
             <span class="chip-lbl">AUTOENCODER MSE</span>
             <span class="chip-val mono">${mseVal}</span>
           </div>
-          <div class="physics-chip full-width" style="cursor: pointer;" id="chipCoordsLocate" title="Click to focus target on GIS Map">
-            <span class="chip-lbl">WGS84 GEOLOCATION & EXTENT (CLICK TO VIEW ON MAP)</span>
-            <span class="chip-val mono" style="color:#38bdf8;"><i class="fa-solid fa-map-location-dot"></i> ${coordsStr} &nbsp;|&nbsp; ${lenM}m (L) × ${widM}m (W)</span>
-          </div>
+          ${geoChipHtml}
         </div>
       `;
 

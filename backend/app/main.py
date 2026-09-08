@@ -58,11 +58,13 @@ CACHED_ANALYSES = {}
 UPLOADS_DIR = os.path.join(PROJECT_ROOT, "outputs", "uploads")
 PREPROCESSED_DIR = os.path.join(PROJECT_ROOT, "outputs", "preprocessed")
 REPORTS_DIR = os.path.join(PROJECT_ROOT, "outputs", "reports")
-SAMPLES_DIR = os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "test")
+SAMPLES_DIR = os.path.join(PROJECT_ROOT, "datasets", "samples")
+TEST_SAMPLES_DIR = os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "test")
 
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(PREPROCESSED_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
+os.makedirs(SAMPLES_DIR, exist_ok=True)
 
 # Mount Static File Routes
 app.mount("/static/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
@@ -134,52 +136,64 @@ def get_sample_missions():
     """Returns curated benchmark acoustic sonar scans for immediate 1-click survey analysis."""
     samples = [
         {
-            "id": "ghost_net_01",
-            "name": "Ghost Fishing Net Mesh",
+            "id": "noaa_h11584_gulf",
+            "name": "NOAA Survey H11584 Mosaic (Gulf of Mexico)",
+            "category": "georeferenced_mosaic",
+            "risk_hint": "HIGH",
+            "filename": "noaa_h11584_gulf_sample.tif",
+            "description": "NOAA NOS Hydrographic Survey H11584 GeoTIFF mosaic in Gulf of Mexico (Mississippi/Alabama safety fairways). Authentic WGS84 UTM 16N coordinates (1.0m/px).",
+            "path": os.path.join(SAMPLES_DIR, "noaa_h11584_gulf_sample.tif"),
+            "url": "/static/samples/noaa_h11584_gulf_sample.tif",
+            "georef_case": "A",
+            "simulated_coords": {"lat": 30.171543, "lon": -87.823543}
+        },
+        {
+            "id": "usgs_14bim05_breton",
+            "name": "USGS DS 1005 Barrier Islands (Breton Sound LA)",
+            "category": "georeferenced_mosaic",
+            "risk_hint": "MEDIUM",
+            "filename": "usgs_14bim05_breton_sample.tif",
+            "description": "USGS DS 1005 high-resolution side-scan sonar mosaic near Breton & Gosier Islands, Louisiana. Authentic WGS84 UTM 16N coordinates (0.50m/px).",
+            "path": os.path.join(SAMPLES_DIR, "usgs_14bim05_breton_sample.tif"),
+            "url": "/static/samples/usgs_14bim05_breton_sample.tif",
+            "georef_case": "A",
+            "simulated_coords": {"lat": 29.425020, "lon": -89.193541}
+        },
+        {
+            "id": "towfish_mission_case_b",
+            "name": "Towfish Survey + Nav Telemetry (Case B)",
+            "category": "sonar_waterfall",
+            "risk_hint": "HIGH",
+            "filename": "towfish_mission_case_b.png",
+            "description": "Acoustic waterfall accompanied by navigation log (latitude, longitude, heading, altitude). Geodesic slant-to-ground range forward projection.",
+            "path": os.path.join(SAMPLES_DIR, "towfish_mission_case_b.png"),
+            "url": "/static/samples/towfish_mission_case_b.png",
+            "georef_case": "B",
+            "simulated_coords": {"lat": 30.193838, "lon": -87.880987}
+        },
+        {
+            "id": "china_offshore_quanzhou_net",
+            "name": "China Offshore SSS-AI (Zenodo 20048164)",
             "category": "fishing_net",
             "risk_hint": "HIGH",
-            "filename": "quanzhou_HN_004.jpg",
-            "description": "Dispersed synthetic polymer netting with high acoustic backscatter highlight and acoustic void shadow.",
-            "path": os.path.join(SAMPLES_DIR, "quanzhou_HN_004.jpg"),
-            "url": "/static/samples/quanzhou_HN_004.jpg",
-            "georef_case": "A",
-            "simulated_coords": {"lat": 42.747402, "lon": -73.794567}
+            "filename": "china_offshore_quanzhou_net.jpg",
+            "description": "Standardized cropped SSS image chip from Zenodo 20048164. Release contains image pixels only; no coordinates provided. Case C Unreferenced.",
+            "path": os.path.join(SAMPLES_DIR, "china_offshore_quanzhou_net.jpg"),
+            "url": "/static/samples/china_offshore_quanzhou_net.jpg",
+            "georef_case": "C",
+            "simulated_coords": None
         },
         {
-            "id": "pipeline_cable_01",
-            "name": "Subsea Pipeline / Power Cable",
+            "id": "china_offshore_dongying_pipe",
+            "name": "China Offshore SSS-AI Pipeline (Zenodo 20048164)",
             "category": "pipeline_or_cable",
             "risk_hint": "HIGH",
-            "filename": "dongying_POC_017.jpg",
-            "description": "Continuous linear acoustic signature with prominent relief shadow across seabed corridor.",
-            "path": os.path.join(SAMPLES_DIR, "dongying_POC_017.jpg"),
-            "url": "/static/samples/dongying_POC_017.jpg",
-            "georef_case": "A",
-            "simulated_coords": {"lat": 42.748950, "lon": -73.792840}
-        },
-        {
-            "id": "rock_cluster_01",
-            "name": "Natural Seabed Moraine / Riprap",
-            "category": "riprap_debris",
-            "risk_hint": "LOW",
-            "filename": "quanzhou_RP_002.jpg",
-            "description": "Dense clustered geological rock formation; filtered and suppressed by DBSCAN spatial clustering.",
-            "path": os.path.join(SAMPLES_DIR, "quanzhou_RP_002.jpg"),
-            "url": "/static/samples/quanzhou_RP_002.jpg",
-            "georef_case": "A",
-            "simulated_coords": {"lat": 42.746120, "lon": -73.796100}
-        },
-        {
-            "id": "engine_part_01",
-            "name": "Heavy Metallic Engine Debris",
-            "category": "engine_debris",
-            "risk_hint": "HIGH",
-            "filename": "dongying_EP_008.jpg",
-            "description": "High-density specular acoustic reflector with sharp boundary and distinct acoustic shadow trailing down-range.",
-            "path": os.path.join(SAMPLES_DIR, "dongying_EP_008.jpg"),
-            "url": "/static/samples/dongying_EP_008.jpg",
-            "georef_case": "A",
-            "simulated_coords": {"lat": 42.745500, "lon": -73.791500}
+            "filename": "china_offshore_dongying_pipeline.jpg",
+            "description": "Continuous linear acoustic signature from Zenodo 20048164. No telemetry provided in dataset; coordinates are strictly withheld.",
+            "path": os.path.join(SAMPLES_DIR, "china_offshore_dongying_pipeline.jpg"),
+            "url": "/static/samples/china_offshore_dongying_pipeline.jpg",
+            "georef_case": "C",
+            "simulated_coords": None
         }
     ]
     valid_samples = [s for s in samples if os.path.exists(s["path"])]
@@ -300,7 +314,8 @@ def analyze_survey(req: AnalyzeRequest):
 
     res = agent.analyze_image(
         image_path=req.image_path,
-        raster_meta_override=req.raster_meta
+        raster_meta_override=req.raster_meta,
+        nav_log=req.nav_log
     )
 
     if res.get("status") == "rejected":

@@ -5,7 +5,7 @@
 
 const API_BASE_URL = "http://localhost:8000";
 
-// Benchmark test dataset for immediate demonstration
+// Benchmark test dataset for immediate demonstration (NOAA Survey H11584, Gulf of Mexico, WGS84 UTM 16N)
 const BENCHMARK_TARGETS = [
   {
     object_id: "TGT_001",
@@ -14,8 +14,10 @@ const BENCHMARK_TARGETS = [
     calibrated_confidence: 0.81,
     anomaly_status: "confirmed_debris",
     risk_score: "HIGH",
-    latitude: 42.747402,
-    longitude: -73.794567,
+    latitude: 30.171543,
+    longitude: -87.823543,
+    lat: 30.171543,
+    lon: -87.823543,
     length_m: 14.2,
     width_m: 5.8,
     area_sq_m: 82.36,
@@ -24,11 +26,13 @@ const BENCHMARK_TARGETS = [
     is_rock_cluster: false,
     position_uncertainty_m: 1.5,
     georeferencing_case: "A",
+    coordinate_system: "WGS84 / UTM Zone 16N (EPSG:32616)",
+    dataset_profile: "NOAA NOS Hydrographic Survey H11584 (Gulf of Mexico, UTM 16N, 1.0m/px)",
     pixel_bbox: { x1: 280, y1: 140, x2: 430, y2: 260 },
     explanation: {
       morphology_note: "Dispersed irregular acoustic backscatter mesh typical of synthetic polymer netting.",
       action_recommendation: "PRIORITY INTERVENTION: Schedule targeted ROV/AUV optical inspection and recovery planning to prevent wildlife entanglement.",
-      executive_narrative: "Target TGT_001 categorized as 'fishing_net' with 81.0% calibrated confidence. Pronounced acoustic shadow confirms elevated benthic relief. Autoencoder error (0.1245) confirms man-made synthetic anomaly. Assigned HIGH ecological hazard."
+      executive_narrative: "Target TGT_001 categorized as 'fishing_net' with 81.0% calibrated confidence in NOAA survey H11584. Pronounced acoustic shadow confirms elevated benthic relief. Assigned HIGH ecological hazard."
     }
   },
   {
@@ -38,8 +42,10 @@ const BENCHMARK_TARGETS = [
     calibrated_confidence: 0.77,
     anomaly_status: "confirmed_debris",
     risk_score: "HIGH",
-    latitude: 42.748950,
-    longitude: -73.792840,
+    latitude: 30.172850,
+    longitude: -87.821940,
+    lat: 30.172850,
+    lon: -87.821940,
     length_m: 38.6,
     width_m: 2.1,
     area_sq_m: 81.06,
@@ -48,11 +54,13 @@ const BENCHMARK_TARGETS = [
     is_rock_cluster: false,
     position_uncertainty_m: 1.5,
     georeferencing_case: "A",
+    coordinate_system: "WGS84 / UTM Zone 16N (EPSG:32616)",
+    dataset_profile: "NOAA NOS Hydrographic Survey H11584 (Gulf of Mexico, UTM 16N, 1.0m/px)",
     pixel_bbox: { x1: 680, y1: 220, x2: 1040, y2: 270 },
     explanation: {
       morphology_note: "Continuous linear/tubular acoustic signature with high aspect ratio.",
       action_recommendation: "ASSET MONITORING: Log pipeline corridor coordinate; inspect for bottom-trawling anchor drag damage.",
-      executive_narrative: "Target TGT_002 categorized as 'pipeline_or_cable' with 77.0% calibrated confidence. Continuous linear backscatter with trailing shadow. Assigned HIGH navigation hazard."
+      executive_narrative: "Target TGT_002 categorized as 'pipeline_or_cable' with 77.0% calibrated confidence in Mississippi fairway corridor. Continuous linear backscatter with trailing shadow. Assigned HIGH navigation hazard."
     }
   },
   {
@@ -62,8 +70,10 @@ const BENCHMARK_TARGETS = [
     calibrated_confidence: 0.04,
     anomaly_status: "noise_rejected",
     risk_score: "LOW",
-    latitude: 42.746120,
-    longitude: -73.796100,
+    latitude: 30.170120,
+    longitude: -87.825100,
+    lat: 30.170120,
+    lon: -87.825100,
     length_m: 3.2,
     width_m: 2.8,
     area_sq_m: 8.96,
@@ -72,11 +82,13 @@ const BENCHMARK_TARGETS = [
     is_rock_cluster: true,
     position_uncertainty_m: 1.5,
     georeferencing_case: "A",
+    coordinate_system: "WGS84 / UTM Zone 16N (EPSG:32616)",
+    dataset_profile: "NOAA NOS Hydrographic Survey H11584 (Gulf of Mexico, UTM 16N, 1.0m/px)",
     pixel_bbox: { x1: 150, y1: 300, x2: 190, y2: 340 },
     explanation: {
       morphology_note: "Dense clustered point highlights characteristic of natural rock moraines.",
       action_recommendation: "NATURAL GEOLOGY: Filtered by DBSCAN spatial cluster suppression; no action required.",
-      executive_narrative: "Target TGT_003_ROCK identified as natural geological rock field; suppressed by DBSCAN density filter (confidence penalized to 4.0%)."
+      executive_narrative: "Target TGT_003_ROCK identified as natural geological formation; suppressed by DBSCAN density filter (confidence penalized to 4.0%)."
     }
   },
   {
@@ -86,8 +98,10 @@ const BENCHMARK_TARGETS = [
     calibrated_confidence: 0.69,
     anomaly_status: "suspicious_anomaly",
     risk_score: "MEDIUM",
-    latitude: 42.745500,
-    longitude: -73.791500,
+    latitude: 30.169500,
+    longitude: -87.820500,
+    lat: 30.169500,
+    lon: -87.820500,
     length_m: 11.5,
     width_m: 7.2,
     area_sq_m: 82.80,
@@ -96,6 +110,8 @@ const BENCHMARK_TARGETS = [
     is_rock_cluster: false,
     position_uncertainty_m: 1.5,
     georeferencing_case: "A",
+    coordinate_system: "WGS84 / UTM Zone 16N (EPSG:32616)",
+    dataset_profile: "NOAA NOS Hydrographic Survey H11584 (Gulf of Mexico, UTM 16N, 1.0m/px)",
     pixel_bbox: { x1: 520, y1: 80, x2: 640, y2: 160 },
     explanation: {
       morphology_note: "Rectilinear geometric acoustic highlight with distinct relief shadow.",
@@ -135,62 +151,54 @@ class SeaSentinelAPI {
 
     return [
       {
-        id: "ghost_net_01",
-        name: "Ghost Fishing Net Mesh",
-        category: "fishing_net",
+        id: "noaa_h11584_gulf",
+        name: "NOAA Survey H11584 Mosaic (Gulf of Mexico)",
+        category: "georeferenced_mosaic",
         risk_hint: "HIGH",
-        filename: "quanzhou_HN_004.jpg",
-        description: "Dispersed synthetic polymer netting with high acoustic backscatter highlight and acoustic void shadow.",
+        filename: "noaa_h11584_gulf_sample.tif",
+        description: "NOAA NOS Hydrographic Survey H11584 GeoTIFF mosaic in Gulf of Mexico. Authentic WGS84 UTM 16N coordinates (1.0m/px).",
         georef_case: "A",
-        simulated_coords: { lat: 42.747402, lon: -73.794567 }
+        simulated_coords: { lat: 30.171543, lon: -87.823543 }
       },
       {
-        id: "pipeline_cable_01",
-        name: "Subsea Pipeline / Cable",
-        category: "fishing_net",
-        risk_hint: "HIGH",
-        filename: "quanzhou_HN_004.jpg",
-        description: "Dispersed synthetic polymer netting with high acoustic backscatter highlight and acoustic void shadow.",
-        path: "backend/datasets/processed/yolo_dataset/images/test/quanzhou_HN_004.jpg",
-        url: "/static/samples/quanzhou_HN_004.jpg",
+        id: "usgs_14bim05_breton",
+        name: "USGS DS 1005 Barrier Islands (Breton Sound LA)",
+        category: "georeferenced_mosaic",
+        risk_hint: "MEDIUM",
+        filename: "usgs_14bim05_breton_sample.tif",
+        description: "USGS DS 1005 high-resolution side-scan sonar mosaic near Breton & Gosier Islands, Louisiana. Authentic WGS84 UTM 16N coordinates (0.50m/px).",
         georef_case: "A",
-        simulated_coords: { lat: 42.747402, lon: -73.794567 }
+        simulated_coords: { lat: 29.425020, lon: -89.193541 }
       },
       {
-        id: "pipeline_cable_01",
-        name: "Subsea Pipeline / Power Cable",
+        id: "towfish_mission_case_b",
+        name: "Towfish Survey + Nav Telemetry (Case B)",
+        category: "sonar_waterfall",
+        risk_hint: "HIGH",
+        filename: "towfish_mission_case_b.png",
+        description: "Acoustic waterfall accompanied by navigation log (latitude, longitude, heading, altitude). Geodesic slant-to-ground range forward projection.",
+        georef_case: "B",
+        simulated_coords: { lat: 30.193838, lon: -87.880987 }
+      },
+      {
+        id: "china_offshore_quanzhou_net",
+        name: "China Offshore SSS-AI (Zenodo 20048164)",
+        category: "fishing_net",
+        risk_hint: "HIGH",
+        filename: "china_offshore_quanzhou_net.jpg",
+        description: "Standardized cropped SSS image chip from Zenodo 20048164. Release contains image pixels only; no coordinates provided. Case C Unreferenced.",
+        georef_case: "C",
+        simulated_coords: null
+      },
+      {
+        id: "china_offshore_dongying_pipe",
+        name: "China Offshore SSS-AI Pipeline (Zenodo 20048164)",
         category: "pipeline_or_cable",
         risk_hint: "HIGH",
-        filename: "dongying_POC_017.jpg",
-        description: "Continuous linear acoustic signature with prominent relief shadow across seabed corridor.",
-        path: "backend/datasets/processed/yolo_dataset/images/test/dongying_POC_017.jpg",
-        url: "/static/samples/dongying_POC_017.jpg",
-        georef_case: "A",
-        simulated_coords: { lat: 42.748950, lon: -73.792840 }
-      },
-      {
-        id: "rock_cluster_01",
-        name: "Natural Seabed Moraine / Riprap",
-        category: "riprap_debris",
-        risk_hint: "LOW",
-        filename: "quanzhou_RP_002.jpg",
-        description: "Dense clustered geological rock formation; filtered and suppressed by DBSCAN spatial clustering.",
-        path: "backend/datasets/processed/yolo_dataset/images/test/quanzhou_RP_002.jpg",
-        url: "/static/samples/quanzhou_RP_002.jpg",
-        georef_case: "A",
-        simulated_coords: { lat: 42.746120, lon: -73.796100 }
-      },
-      {
-        id: "engine_part_01",
-        name: "Heavy Metallic Engine Debris",
-        category: "engine_debris",
-        risk_hint: "HIGH",
-        filename: "dongying_EP_008.jpg",
-        description: "High-density specular acoustic reflector with sharp boundary and distinct acoustic shadow trailing down-range.",
-        path: "backend/datasets/processed/yolo_dataset/images/test/dongying_EP_008.jpg",
-        url: "/static/samples/dongying_EP_008.jpg",
-        georef_case: "A",
-        simulated_coords: { lat: 42.745500, lon: -73.791500 }
+        filename: "china_offshore_dongying_pipeline.jpg",
+        description: "Continuous linear acoustic signature from Zenodo 20048164. No telemetry provided in dataset; coordinates are strictly withheld.",
+        georef_case: "C",
+        simulated_coords: null
       }
     ];
   }
@@ -231,10 +239,10 @@ class SeaSentinelAPI {
         average_confidence: 0.77
       },
       nav_log: {
-        heading: 15.0,
+        heading: 85.0,
         altitude_m: 12.0,
-        latitude: 42.747402,
-        longitude: -73.794567
+        latitude: 30.171543,
+        longitude: -87.823543
       }
     };
   }

@@ -233,6 +233,7 @@ class GISMap {
     this.lastCoords = validCoords;
 
     if (validCoords.length > 0) {
+      this._removeUnreferencedNotice();
       if (validCoords.length === 1) {
         this.lastCenter = validCoords[0];
         this.lastZoom = 16;
@@ -247,9 +248,59 @@ class GISMap {
 
       // Apply view safely with container dimensions validation
       this._applyView();
+    } else if (surveyMeta && surveyMeta.bbox_wgs84) {
+      // Georeferenced survey without target detections (e.g. clean seabed mosaic)
+      this._removeUnreferencedNotice();
+      const b = surveyMeta.bbox_wgs84;
+      const bounds = [[b.min_lat, b.min_lon], [b.max_lat, b.max_lon]];
+      const rect = L.rectangle(bounds, {
+        color: '#00e5ff',
+        weight: 2,
+        fillColor: '#00e5ff',
+        fillOpacity: 0.08,
+        dashArray: '4, 6'
+      }).bindTooltip(`Survey Boundary: ${surveyMeta.dataset_profile || 'GeoTIFF Mosaic'}`, { sticky: true });
+      this.surveyLayers.addLayer(rect);
+      this.lastBounds = L.latLngBounds(bounds);
+      this.lastCenter = this.lastBounds.getCenter();
+      this._applyView();
     } else {
       this.lastBounds = null;
+      this._showUnreferencedNotice(surveyMeta);
     }
+  }
+
+  _showUnreferencedNotice(surveyMeta = {}) {
+    this._removeUnreferencedNotice();
+    const container = this.map ? this.map.getContainer() : document.getElementById("sonarMap");
+    if (!container) return;
+
+    const noticeEl = document.createElement("div");
+    noticeEl.id = "mapUnrefOverlay";
+    noticeEl.className = "map-unref-overlay";
+    const profile = surveyMeta.dataset_profile || "Unreferenced Acoustic Chip (Case C)";
+    noticeEl.innerHTML = `
+      <div class="map-unref-card">
+        <div class="unref-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+        <div class="unref-content">
+          <div class="unref-title">UNREFERENCED DATASET (Case C)</div>
+          <div class="unref-source"><b>Source Profile:</b> ${profile}</div>
+          <div class="unref-text">
+            This sonar dataset contains no embedded GeoTIFF tags (CRS/Affine) or navigation telemetry logs.
+            In compliance with hydrographic safety standards, <b>synthetic coordinates are strictly suppressed</b>.
+          </div>
+          <div class="unref-action">
+            <i class="fa-solid fa-circle-info"></i> To visualize targets on this GIS Map, select a <b>Georeferenced GeoTIFF</b> (e.g. NOAA Survey H11584, USGS DS 1005) or provide sidecar navigation logs.
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(noticeEl);
+  }
+
+  _removeUnreferencedNotice() {
+    const existing = document.getElementById("mapUnrefOverlay");
+    if (existing) existing.remove();
   }
 
   _renderSurveySwath(validCoords, surveyMeta) {

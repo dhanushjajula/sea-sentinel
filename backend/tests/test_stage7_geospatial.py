@@ -206,6 +206,94 @@ def test_geojson_and_csv_export():
             assert rows[0]["object_id"] == "TGT_001"
 
 
+def test_noaa_h11584_georeferencing():
+    """Verify NOAA Survey H11584 user-defined GeoKey 32767 is decoded to UTM 16N (EPSG:32616) in Gulf of Mexico."""
+    engine = GeospatialEngine()
+
+    h11584_path = os.path.join(PROJECT_ROOT, "outputs", "uploads", "264a97dc_H11584_SSSAB_1m_445kHz_1of2.tif")
+    if os.path.exists(h11584_path):
+        meta = engine.read_raster_metadata(h11584_path)
+        assert meta["georeferenced"] is True
+        assert meta["crs"] == "EPSG:32616", f"Expected EPSG:32616 for NOAA H11584, got {meta['crs']}"
+        assert meta["res"] == (1.0, 1.0)
+        assert "H11584" in meta.get("dataset_profile", "")
+
+        # Origin tiepoint check (Mobile Bay / Mississippi Sound Gulf waters)
+        x_map, y_map = engine.locate_case_a((0.0, 0.0), meta)
+        lat, lon = engine.to_lat_lon(x_map, y_map, meta["crs"])
+        assert lat is not None and lon is not None
+        assert 30.10 <= lat <= 30.25, f"Expected Gulf of Mexico latitude ~30.19 deg, got {lat}"
+        assert -87.95 <= lon <= -87.80, f"Expected Gulf of Mexico longitude ~-87.88 deg, got {lon}"
+
+
+def test_usgs_14bim05_georeferencing_parameters():
+    """Verify USGS DS 1005 (14BIM05 SSS 50cm) parameters transform to Breton Island, Louisiana."""
+    engine = GeospatialEngine()
+
+    # USGS DS 1005 Tile 1 authentic parameters
+    meta_usgs = {
+        "crs": "EPSG:32616",  # WGS 84 / UTM Zone 16N
+        "transform": [284946.0, 0.50, 0.0, 3259333.473, 0.0, -0.50],
+        "res": (0.50, 0.50),
+        "width": 10219,
+        "height": 8875,
+        "georeferenced": True
+    }
+
+    # Transform origin to WGS84
+    x_map, y_map = engine.locate_case_a((0.0, 0.0), meta_usgs)
+    lat, lon = engine.to_lat_lon(x_map, y_map, meta_usgs["crs"])
+    assert lat is not None and lon is not None
+    assert 29.35 <= lat <= 29.50, f"Expected Breton Island LA latitude ~29.44 deg, got {lat}"
+    assert -89.30 <= lon <= -89.10, f"Expected Breton Island LA longitude ~-89.22 deg, got {lon}"
+
+
+def test_zenodo_unreferenced_data_integrity():
+    """Verify Zenodo 20048164 image chips are classified as Case C with coordinates withheld."""
+    engine = GeospatialEngine()
+
+    # Use existing sample chip
+    chip_path = os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "train", "quanzhou_HN_001.jpg")
+    if os.path.exists(chip_path):
+        meta = engine.read_raster_metadata(chip_path)
+        assert meta["georeferenced"] is False
+        assert meta["crs"] is None
+        assert meta["transform"] is None
+        assert "China Offshore" in meta.get("dataset_profile", "")
+
+        case = engine.classify_georef_case(meta)
+        assert case == "C", f"Expected Case C for Zenodo chip, got {case}"
+
+
+def test_sidecar_nav_log_ingestion():
+    """Verify sidecar navigation JSON file is automatically detected and parsed."""
+    engine = GeospatialEngine()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fake_img = os.path.join(tmpdir, "sonar_run_01.png")
+        fake_nav = os.path.join(tmpdir, "sonar_run_01.nav.json")
+        with open(fake_img, "wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\n")
+
+        nav_content = {
+            "latitude": 29.4450,
+            "longitude": -89.2172,
+            "heading": 135.0,
+            "altitude_m": 12.0,
+            "slant_range_m": 75.0
+        }
+        with open(fake_nav, "w", encoding="utf-8") as f:
+            json.dump(nav_content, f)
+
+        meta = engine.read_raster_metadata(fake_img)
+        assert meta["georeferenced"] is True
+        assert meta["nav_log"] is not None
+        assert meta["nav_log"]["latitude"] == 29.4450
+
+        case = engine.classify_georef_case(meta)
+        assert case == "B"
+
+
 if __name__ == "__main__":
     print("Running Stage 7 Unit Tests...")
     test_geotagger_case_classification()
@@ -222,4 +310,12 @@ if __name__ == "__main__":
     print("  [PASSED] test_dimension_estimator_rotated_mask")
     test_geojson_and_csv_export()
     print("  [PASSED] test_geojson_and_csv_export")
+    test_noaa_h11584_georeferencing()
+    print("  [PASSED] test_noaa_h11584_georeferencing")
+    test_usgs_14bim05_georeferencing_parameters()
+    print("  [PASSED] test_usgs_14bim05_georeferencing_parameters")
+    test_zenodo_unreferenced_data_integrity()
+    print("  [PASSED] test_zenodo_unreferenced_data_integrity")
+    test_sidecar_nav_log_ingestion()
+    print("  [PASSED] test_sidecar_nav_log_ingestion")
     print("All Stage 7 unit tests executed successfully!")
