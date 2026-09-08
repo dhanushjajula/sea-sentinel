@@ -80,16 +80,21 @@ class SIHPipelineAgent:
         t_val = round((time.perf_counter() - t0) * 1000, 2)
 
         if not val_res.get("valid"):
+            err_msg = val_res.get("error", "Input validation failed.")
+            if val_res.get("reason"):
+                err_msg = f"{err_msg} ({val_res.get('reason')})"
             execution_trace.append({
                 "stage": "input_validation",
                 "status": "failed",
                 "duration_ms": t_val,
-                "error": val_res.get("error")
+                "error": err_msg
             })
             return {
                 "analysis_id": analysis_id,
                 "status": "rejected",
-                "error": val_res.get("error"),
+                "is_sonar": False,
+                "error": err_msg,
+                "details": val_res.get("details", {}),
                 "execution_trace": execution_trace
             }
 

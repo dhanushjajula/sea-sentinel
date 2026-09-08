@@ -130,6 +130,85 @@ class WaterfallViewer {
     }
   }
 
+  clearImages() {
+    this.rawImage = null;
+    this.enhancedImage = null;
+    this.annotatedImage = null;
+    this.targets = [];
+    this.selectedTargetId = null;
+  }
+
+  showRejectionPlaceholder(reason) {
+    this.clearImages();
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const ctx = this.ctx;
+
+    // Background: Tactical dark acoustic sensor offline grid
+    ctx.fillStyle = "#030a16";
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle tactical grid
+    ctx.strokeStyle = "rgba(255, 51, 102, 0.08)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    // Acoustic Nadir center line (dashed red)
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = "rgba(255, 51, 102, 0.35)";
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 0);
+    ctx.lineTo(w / 2, h);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Warning Badge / Modal in Center
+    const boxW = Math.min(680, w - 40);
+    const boxH = 140;
+    const boxX = (w - boxW) / 2;
+    const boxY = (h - boxH) / 2;
+
+    ctx.fillStyle = "rgba(18, 5, 12, 0.92)";
+    ctx.strokeStyle = "rgba(255, 51, 102, 0.55)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+    } else {
+      ctx.rect(boxX, boxY, boxW, boxH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // Rejection Header
+    ctx.font = "bold 15px 'JetBrains Mono', monospace";
+    ctx.fillStyle = "#ff3366";
+    ctx.textAlign = "center";
+    ctx.fillText("⚠ ACOUSTIC SENSOR REJECTION: NON-SONAR INPUT", w / 2, boxY + 38);
+
+    // Rejection Subtext
+    ctx.font = "12px 'Outfit', sans-serif";
+    ctx.fillStyle = "#fca5a5";
+    const cleanReason = reason ? (reason.length > 90 ? reason.substring(0, 90) + "..." : reason) : "Optical or non-acoustic raster detected.";
+    ctx.fillText(cleanReason, w / 2, boxY + 68);
+
+    ctx.font = "11px 'JetBrains Mono', monospace";
+    ctx.fillStyle = "#8da2be";
+    ctx.fillText("Sea Sentinel operates strictly on Side-Scan Sonar (SSS) acoustic backscatter.", w / 2, boxY + 95);
+    ctx.fillText("No acoustic targets, shadow reliefs, or geolocations plotted.", w / 2, boxY + 115);
+  }
+
   _getTargetCanvasCoords(t, w, h) {
     const norm = t.norm_bbox;
     if (norm && (norm.x2 > norm.x1)) {

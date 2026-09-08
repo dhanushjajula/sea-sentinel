@@ -19,8 +19,10 @@
 
   <!-- Custom Design System -->
   <link rel="stylesheet" href="css/style.css">
-</head>
 <body>
+
+  <!-- High-Tech Floating Toast Notification System -->
+  <div class="toast-container" id="appToastContainer"></div>
 
   <!-- Cinematic Splash Screen Intro -->
   <div class="splash-screen" id="appSplashScreen">
@@ -171,6 +173,17 @@
             <div class="complete-meta" id="completeMeta">ID: SURVEY_053E90C0 · 75227.55ms · Accuracy: 79.6%</div>
             <button class="btn-analyze-another" id="btnAnalyzeAnother">Analyze Another</button>
           </div>
+
+          <!-- Rejected / Non-Sonar Input State -->
+          <div id="dropzoneRejectState" class="dropzone-rejected" style="display: none;">
+            <div class="reject-circle"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div class="reject-title">NOT A SIDE-SCAN SONAR IMAGE</div>
+            <div class="reject-meta" id="rejectMetaReason">Optical color spectrum detected. Authentic Side-Scan Sonar records single-channel acoustic backscatter reverberation, not multi-channel chromatic photos.</div>
+            <div class="reject-actions">
+              <button class="btn-reject-retry" id="btnRejectBrowse"><i class="fa-solid fa-folder-open"></i> Browse Sonar Image</button>
+              <button class="btn-reject-demo" id="btnRejectDemo"><i class="fa-solid fa-flask"></i> Load Demo Sonar Mission</button>
+            </div>
+          </div>
         </div>
 
         <!-- Horizontal Pipeline Stepper -->
@@ -253,35 +266,62 @@
 
     </section>
 
-    <!-- Column 3: Target Inspector -->
-    <aside class="glass-panel inspector-panel">
-      <div class="panel-header">
-        <span class="panel-title"><i class="fa-solid fa-crosshairs"></i> Target Inspector</span>
-        <span class="panel-tag gray">MULTI-FACTOR TIER</span>
+    <!-- Column 3: Target Inspector & AI Explainability Stage -->
+    <aside class="right-stage">
+
+      <!-- Sub-Panel 1: Target Inspector -->
+      <div class="glass-panel inspector-panel">
+        <div class="panel-header">
+          <span class="panel-title"><i class="fa-solid fa-crosshairs"></i> Target Inspector</span>
+          <span class="panel-tag cyan" id="inspectorTargetCount">MULTI-FACTOR TIER</span>
+        </div>
+        <div class="panel-subheader">
+          <span class="sub-hint"><i class="fa-solid fa-arrow-pointer"></i> Click target to focus &amp; inspect</span>
+          <span class="sub-status" id="inspectorFilterHint">All Targets</span>
+        </div>
+        <div class="target-card-list" id="targetListContainer">
+          <!-- Rendered dynamically by app.js -->
+        </div>
       </div>
 
-      <!-- Target List -->
-      <div class="target-card-list" id="targetListContainer">
-        <!-- Rendered dynamically by app.js -->
+      <!-- Sub-Panel 2: AI Hydrographic Explainability -->
+      <div class="glass-panel explainability-panel">
+        <div class="panel-header">
+          <span class="panel-title"><i class="fa-solid fa-brain"></i> AI Hydrographic Explainability</span>
+          <span class="panel-tag green" id="explainabilityStatusTag">ACOUSTIC INFERENCE</span>
+        </div>
+        <div class="explainability-body">
+          <div class="explain-card">
+            <div class="explain-card-header">
+              <span class="explain-card-title"><i class="fa-solid fa-file-waveform"></i> Executive Assessment</span>
+              <span class="sub-chip" id="targetClassChip">Awaiting Selection</span>
+            </div>
+            <p class="narrative-text" id="targetNarrative">
+              Select or hover any detected seabed target to inspect acoustic backscatter morphology, shadow verification, and intervention protocols.
+            </p>
+          </div>
+
+          <div class="explain-card">
+            <div class="explain-card-header">
+              <span class="explain-card-title"><i class="fa-solid fa-microchip"></i> Acoustic Verification Telemetry</span>
+            </div>
+            <div class="physics-details" id="targetPhysicsDetails">
+              <div class="physics-placeholder">
+                <i class="fa-solid fa-wave-square"></i>
+                <span>Acoustic verification telemetry standing by</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-rec-wrap" id="targetActionRec">
+            <div class="action-rec-badge idle">
+              <i class="fa-solid fa-compass"></i> Awaiting target selection from inspector list.
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- AI Hydrographic Explainability Box -->
-      <div class="narrative-box">
-        <div class="narrative-title">
-          <i class="fa-solid fa-brain"></i> AI Hydrographic Explainability
-        </div>
-        <p class="narrative-text" id="targetNarrative">
-          Select or point to any target to inspect acoustic morphology, anomaly score, and recommended intervention.
-        </p>
-        <div class="physics-details" id="targetPhysicsDetails">
-          <span style="color:var(--text-dim);">Acoustic model ready</span>
-        </div>
-        <div class="action-rec" id="targetActionRec">
-          Awaiting target selection.
-        </div>
-      </div>
     </aside>
-
   </main>
 
   <!-- =========================================================

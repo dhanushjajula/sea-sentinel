@@ -188,7 +188,11 @@ class SeaSentinelAPI {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-      throw new Error(err.detail || `Upload failed with status ${res.status}`);
+      const error = new Error(err.detail || `Upload failed with status ${res.status}`);
+      error.status = res.status;
+      error.isSonar = false;
+      error.detail = err.detail;
+      throw error;
     }
 
     return await res.json();
@@ -209,7 +213,11 @@ class SeaSentinelAPI {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: "Analysis failed" }));
-      throw new Error(err.detail || `Analysis failed with status ${res.status}`);
+      const error = new Error(err.detail || `Analysis failed with status ${res.status}`);
+      error.status = res.status;
+      error.isSonar = false;
+      error.detail = err.detail;
+      throw error;
     }
 
     return await res.json();

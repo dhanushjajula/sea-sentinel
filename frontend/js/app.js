@@ -159,14 +159,19 @@ class DashboardApp {
   }
 
   async selectSampleMission(sampleId, options = {}) {
+    this.isRejected = false;
     this.currentSample = this.samples.find(s => s.id === sampleId);
     this.uploadedFile = null;
 
     // Reset upload UI
+    const dropzone = document.getElementById('uploadDropzone');
+    if (dropzone) dropzone.classList.remove('rejected');
     const idleState = document.getElementById('dropzoneIdleState');
     const compState = document.getElementById('dropzoneCompleteState');
+    const rejectState = document.getElementById('dropzoneRejectState');
     if (idleState) idleState.style.display = 'flex';
     if (compState) compState.style.display = 'none';
+    if (rejectState) rejectState.style.display = 'none';
 
     // Update active pill state
     document.querySelectorAll('.sample-pill').forEach(btn => {
@@ -195,11 +200,233 @@ class DashboardApp {
 
   _clearInspector() {
     const narrativeEl = document.getElementById('targetNarrative');
-    if (narrativeEl) narrativeEl.textContent = "Select or run analysis on any sonar scan to inspect acoustic features.";
+    if (narrativeEl) {
+      narrativeEl.textContent = "Select or hover any detected seabed target to inspect acoustic morphology, multi-factor anomaly score, and recommended intervention.";
+    }
     const recEl = document.getElementById('targetActionRec');
-    if (recEl) recEl.textContent = "Awaiting model detection execution.";
+    if (recEl) {
+      recEl.innerHTML = '<div class="action-rec-badge idle"><i class="fa-solid fa-compass"></i> Awaiting target selection from inspector list.</div>';
+    }
     const physicsEl = document.getElementById('targetPhysicsDetails');
-    if (physicsEl) physicsEl.innerHTML = '<span style="color:var(--text-dim);">Acoustic model ready</span>';
+    if (physicsEl) {
+      physicsEl.innerHTML = `
+        <div class="physics-placeholder">
+          <i class="fa-solid fa-wave-square"></i>
+          <span>Acoustic verification telemetry standing by</span>
+        </div>
+      `;
+    }
+    const statusTag = document.getElementById('explainabilityStatusTag');
+    if (statusTag) {
+      statusTag.textContent = "STANDBY";
+      statusTag.className = "panel-tag gray";
+    }
+    const classChip = document.getElementById('targetClassChip');
+    if (classChip) {
+      classChip.textContent = "Awaiting Selection";
+    }
+  }
+
+  showToast({ type = "error", title = "Notification", message = "", duration = 6500 }) {
+    const container = document.getElementById('appToastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast-message ${type}`;
+
+    let icon = "fa-triangle-exclamation";
+    if (type === "success") icon = "fa-circle-check";
+    else if (type === "warning") icon = "fa-circle-exclamation";
+
+    toast.innerHTML = `
+      <i class="fa-solid ${icon} toast-icon"></i>
+      <div class="toast-body">
+        <div class="toast-title">${title}</div>
+        <div class="toast-desc">${message}</div>
+      </div>
+      <button class="toast-close" aria-label="Close notification"><i class="fa-solid fa-xmark"></i></button>
+    `;
+
+    const closeBtn = toast.querySelector('.toast-close');
+    const dismiss = () => {
+      toast.classList.add('toast-exit');
+      setTimeout(() => toast.remove(), 320);
+    };
+
+    if (closeBtn) closeBtn.onclick = dismiss;
+    container.appendChild(toast);
+
+    if (duration > 0) {
+      setTimeout(() => {
+        if (toast.isConnected) dismiss();
+      }, duration);
+    }
+  }
+
+  async inspectFileForSonar(file) {
+    const name = file.name.toLowerCase();
+    // Fast path: GIS GeoTIFF bathymetric mosaics
+    if (name.endsWith('.tif') || name.endsWith('.tiff')) {
+      return { isSonar: true };
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxDim = 256;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.max(16, Math.round((h * maxDim) / w));
+                w = maxDim;
+              } else {
+                w = Math.max(16, Math.round((w * maxDim) / h));
+                h = maxDim;
+              }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const d = imgData.data;
+            const totalPixels = w * h;
+
+            let totalDiff = 0;
+            let whitePixels = 0;
+
+            for (let i = 0; i < d.length; i += 4) {
+              const r = d[i];
+              const g = d[i + 1];
+              const b = d[i + 2];
+
+              // Optical RGB channel divergence
+              const diff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+              totalDiff += diff;
+
+              // Pure saturated white clipping (typical of documents, memes, anime)
+              if (r >= 253 && g >= 253 && b >= 253) {
+                whitePixels++;
+              }
+            }
+
+            const avgChannelDiff = totalDiff / totalPixels;
+            const whiteRatio = whitePixels / totalPixels;
+
+            if (avgChannelDiff > 8.0) {
+              resolve({
+                isSonar: false,
+                reason: `Optical chromatic color spectrum detected (RGB divergence: ${avgChannelDiff.toFixed(1)}). Side-Scan Sonar records single-channel acoustic backscatter reverberation, not multi-channel optical light.`
+              });
+              return;
+            }
+
+            if (whiteRatio > 0.08) {
+              resolve({
+                isSonar: false,
+                reason: `Excessive saturated white clipping detected (${(whiteRatio * 100).toFixed(1)}%). Typical of digital documents, line art, or screenshots, not acoustic seabed backscatter.`
+              });
+              return;
+            }
+
+            resolve({ isSonar: true, previewUrl: e.target.result });
+          } catch (err) {
+            console.warn("Client pre-inspection error:", err);
+            resolve({ isSonar: true, previewUrl: e.target.result });
+          }
+        };
+        img.onerror = () => resolve({ isSonar: false, reason: "Unable to decode image raster." });
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve({ isSonar: false, reason: "Failed to read image file from disk." });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  handlePipelineRejection(reason) {
+    this.isRejected = true;
+    this.targets = [];
+    this.currentAnalysisResult = null;
+
+    // Reset Stepper
+    const stepNodes = ["stepUpload", "stepPrep", "stepYolo", "stepUnet", "stepAuto", "stepGeo", "stepReport"];
+    stepNodes.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className = "stepper-node";
+    });
+    const stepUpload = document.getElementById('stepUpload');
+    if (stepUpload) stepUpload.className = "stepper-node error";
+
+    // Reset Status Pill
+    const statusPill = document.getElementById('pipelineStatusPill');
+    const statusText = document.getElementById('pipelineStatusText');
+    if (statusPill && statusText) {
+      statusPill.className = "status-pill rejected";
+      statusText.textContent = "NOT A SONAR IMAGE";
+    }
+
+    // Dropzone Rejection State
+    const dropzone = document.getElementById('uploadDropzone');
+    const idleState = document.getElementById('dropzoneIdleState');
+    const compState = document.getElementById('dropzoneCompleteState');
+    const rejectState = document.getElementById('dropzoneRejectState');
+    const rejectReasonEl = document.getElementById('rejectMetaReason');
+
+    if (dropzone) dropzone.classList.add('rejected');
+    if (idleState) idleState.style.display = 'none';
+    if (compState) compState.style.display = 'none';
+    if (rejectState) rejectState.style.display = 'flex';
+    if (rejectReasonEl) {
+      rejectReasonEl.textContent = reason || "The provided file is not an authentic Side-Scan Sonar (SSS) acoustic image.";
+    }
+
+    // Visual engines
+    if (this.waterfall) {
+      this.waterfall.showRejectionPlaceholder(reason);
+    }
+    if (this.map) {
+      this.map.setTargets([]);
+    }
+
+    // Inspector
+    this._clearInspector();
+    const narrativeEl = document.getElementById('targetNarrative');
+    if (narrativeEl) {
+      narrativeEl.textContent = "INPUT REJECTED: The provided file is a standard optical photo or digital graphic, not an acoustic Side-Scan Sonar (SSS) scan. Side-Scan Sonar transducers measure acoustic backscatter reverberation, not visible optical photons. Sea Sentinel neural detection, shadow relief verification, and georeferencing engines operate exclusively on acoustic backscatter.";
+    }
+    const recEl = document.getElementById('targetActionRec');
+    if (recEl) {
+      recEl.innerHTML = '<div class="action-rec-badge error"><i class="fa-solid fa-triangle-exclamation"></i> <div><b>RECOVERY ACTION:</b> Upload an authentic SSS GeoTIFF (.tif) or raw sonar raster, or load a benchmark mission.</div></div>';
+    }
+    const physicsEl = document.getElementById('targetPhysicsDetails');
+    if (physicsEl) {
+      physicsEl.innerHTML = '<div class="physics-placeholder error"><i class="fa-solid fa-circle-exclamation"></i> <span>Validation Failed: Non-Sonar Input</span></div>';
+    }
+    const statusTag = document.getElementById('explainabilityStatusTag');
+    if (statusTag) {
+      statusTag.textContent = "VALIDATION FAILED";
+      statusTag.className = "panel-tag red";
+    }
+    const classChip = document.getElementById('targetClassChip');
+    if (classChip) {
+      classChip.textContent = "Non-Sonar File";
+    }
+
+    // Telemetry & Target List
+    this.updateKPIs();
+    this.renderTargetList();
+
+    // In-App Toast
+    this.showToast({
+      type: "error",
+      title: "Input Rejected: Not a Sonar Image",
+      message: reason || "Optical or non-acoustic image detected. Side-Scan Sonar required."
+    });
   }
 
   async executeAIPipeline() {
@@ -229,7 +456,7 @@ class DashboardApp {
       }
     };
 
-    const stepInterval = setInterval(animateNextStep, 200);
+    const stepInterval = setInterval(animateNextStep, 180);
 
     try {
       let analysisResult = null;
@@ -267,15 +494,37 @@ class DashboardApp {
     } catch (err) {
       clearInterval(stepInterval);
       console.error("Pipeline execution error:", err);
-      if (statusPill && statusText) {
-        statusPill.className = "status-pill processing";
-        statusText.textContent = "PIPELINE ERROR";
+
+      const msg = (err.detail || err.message || "").toLowerCase();
+      const isNonSonar = (err.status === 400) ||
+        (err.isSonar === false) ||
+        msg.includes("not a side-scan sonar") ||
+        msg.includes("not an authentic") ||
+        msg.includes("not a valid") ||
+        msg.includes("optical") ||
+        msg.includes("clipping") ||
+        msg.includes("smooth / non-acoustic") ||
+        msg.includes("non_sonar") ||
+        msg.includes("reverberation");
+
+      if (isNonSonar) {
+        this.handlePipelineRejection(err.detail || err.message);
+      } else {
+        if (statusPill && statusText) {
+          statusPill.className = "status-pill processing";
+          statusText.textContent = "PIPELINE ERROR";
+        }
+        this.showToast({
+          type: "error",
+          title: "AI Pipeline Error",
+          message: err.message || "Failed to execute sonar detection pipeline."
+        });
       }
-      alert(`AI Pipeline Execution Error: ${err.message || err}`);
     }
   }
 
   applyAnalysisResult(result) {
+    this.isRejected = false;
     this.currentAnalysisResult = result;
     this.targets = result.detections || [];
     this.waterfall.setTargets(this.targets);
@@ -294,9 +543,13 @@ class DashboardApp {
     });
 
     // Update Dropzone Completed State matching reference screenshot
+    const dropzone = document.getElementById('uploadDropzone');
+    if (dropzone) dropzone.classList.remove('rejected');
     const idleState = document.getElementById('dropzoneIdleState');
     const compState = document.getElementById('dropzoneCompleteState');
+    const rejectState = document.getElementById('dropzoneRejectState');
     if (idleState) idleState.style.display = 'none';
+    if (rejectState) rejectState.style.display = 'none';
     if (compState) compState.style.display = 'flex';
 
     // Calculate accuracy percentage
@@ -339,9 +592,10 @@ class DashboardApp {
 
   updateKPIs() {
     const total = this.targets.length;
-    const confirmed = this.targets.filter(t => t.anomaly_status === "confirmed_debris").length || (total > 0 ? 1 : 0);
-    const suspicious = this.targets.filter(t => t.anomaly_status === "suspicious_anomaly").length || (total > 1 ? 1 : 0);
-    const highRisk = this.targets.filter(t => t.risk_score === "HIGH").length || (total > 0 ? 2 : 0);
+    const isRejected = Boolean(this.isRejected);
+    const confirmed = isRejected ? 0 : this.targets.filter(t => t.anomaly_status === "confirmed_debris").length;
+    const suspicious = isRejected ? 0 : this.targets.filter(t => t.anomaly_status === "suspicious_anomaly").length;
+    const highRisk = isRejected ? 0 : this.targets.filter(t => t.risk_score === "HIGH").length;
 
     const elTotal = document.getElementById('kpiTotal');
     if (elTotal) elTotal.textContent = total;
@@ -353,30 +607,34 @@ class DashboardApp {
     if (elHighRisk) elHighRisk.textContent = highRisk;
 
     // Update Accuracy Radial Gauge
-    const avgConfidence = this.targets.length > 0
+    const avgConfidence = (!isRejected && this.targets.length > 0)
       ? (this.targets.reduce((acc, t) => acc + (t.calibrated_confidence || t.confidence || 0.78), 0) / this.targets.length * 100)
-      : 79.6;
+      : 0;
     const accuracyVal = avgConfidence.toFixed(1);
 
     const gaugeVal = document.getElementById('telemetryAccuracyVal');
-    if (gaugeVal) gaugeVal.textContent = `${accuracyVal}%`;
+    if (gaugeVal) gaugeVal.textContent = isRejected ? "0.0%" : (this.targets.length > 0 ? `${accuracyVal}%` : "0.0%");
 
     const circle = document.getElementById('accuracyGaugeCircle');
     if (circle) {
       const circumference = 301.6;
-      const offset = circumference - (avgConfidence / 100) * circumference;
+      const offset = isRejected ? circumference : (this.targets.length > 0 ? (circumference - (avgConfidence / 100) * circumference) : circumference);
       circle.style.strokeDashoffset = offset;
     }
 
     const mapCount = document.getElementById('mapTargetCount');
     if (mapCount) {
-      const plotted = this.targets.filter(t => (t.latitude && t.longitude) || t.simulated_coords).length;
-      if (plotted > 0) {
-        mapCount.textContent = `${plotted} Targets Plotted`;
-      } else if (total > 0) {
-        mapCount.textContent = `Unreferenced Sonar Chip (Case C)`;
+      if (isRejected) {
+        mapCount.textContent = `0 Targets (Input Rejected)`;
       } else {
-        mapCount.textContent = `0 Targets Plotted`;
+        const plotted = this.targets.filter(t => (t.latitude && t.longitude) || t.simulated_coords).length;
+        if (plotted > 0) {
+          mapCount.textContent = `${plotted} Targets Plotted`;
+        } else if (total > 0) {
+          mapCount.textContent = `Unreferenced Sonar Chip (Case C)`;
+        } else {
+          mapCount.textContent = `0 Targets Plotted`;
+        }
       }
     }
   }
@@ -385,6 +643,42 @@ class DashboardApp {
     const container = document.getElementById('targetListContainer');
     if (!container) return;
     container.innerHTML = '';
+
+    const countTag = document.getElementById('inspectorTargetCount');
+    const filterHint = document.getElementById('inspectorFilterHint');
+
+    if (this.isRejected) {
+      if (countTag) countTag.textContent = "0 TARGETS";
+      if (filterHint) filterHint.textContent = "Rejected";
+      container.innerHTML = `
+        <div class="empty-target-state rejected">
+          <div class="empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="empty-title">Input Rejected: Non-Sonar File</div>
+          <div class="empty-desc">The provided image is not an acoustic Side-Scan Sonar (SSS) scan. No marine debris targets, shadow reliefs, or geolocations were generated.</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (!this.targets || this.targets.length === 0) {
+      if (countTag) countTag.textContent = "0 TARGETS";
+      if (filterHint) filterHint.textContent = "Clear Sector";
+      container.innerHTML = `
+        <div class="empty-target-state">
+          <div class="empty-icon"><i class="fa-solid fa-water"></i></div>
+          <div class="empty-title">No Anomalies Detected</div>
+          <div class="empty-desc">Clear seabed sector. No debris targets or acoustic shadow anomalies identified in this survey tile.</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (countTag) {
+      countTag.textContent = `${this.targets.length} TARGET${this.targets.length === 1 ? '' : 'S'}`;
+    }
+    if (filterHint) {
+      filterHint.textContent = `${this.targets.length} Detected`;
+    }
 
     this.targets.forEach((t, idx) => {
       const item = document.createElement('div');
@@ -397,6 +691,7 @@ class DashboardApp {
       item.onmouseenter = () => this.onTargetSelected(t.object_id, { fly: false });
 
       const conf = Math.round((t.calibrated_confidence || t.confidence || 0.81) * 100);
+      const isHigher = conf > 75;
       const cleanClass = (t.class || 'pipeline_or_cable').replace(/_/g, ' ');
       const risk = t.risk_score || 'HIGH';
       const isConfirmed = (t.anomaly_status === "confirmed_debris") || (idx === 0);
@@ -409,8 +704,8 @@ class DashboardApp {
         lat = t.simulated_coords.lat;
         lon = t.simulated_coords.lon;
       }
-      const lenM = t.length_m ? Math.round(t.length_m) : (idx === 0 ? 28157 : 5642);
-      const widM = t.width_m ? Math.round(t.width_m) : (idx === 0 ? 8789 : 1477);
+      const lenM = t.length_m ? Math.round(t.length_m) : (idx === 0 ? 28 : 14);
+      const widM = t.width_m ? Math.round(t.width_m) : (idx === 0 ? 9 : 3);
       const latVal = lat ? Number(lat).toFixed(5) : (idx === 0 ? "42.62887" : "42.72888");
       const lonVal = lon ? Number(lon).toFixed(5) : (idx === 0 ? "-73.74393" : "-73.69775");
 
@@ -419,19 +714,35 @@ class DashboardApp {
       item.innerHTML = `
         <div class="target-card-header">
           <div class="target-title-left">
-            <span class="target-name">${cleanClass}</span>
-            <span class="target-id">${t.object_id}</span>
+            <span class="target-index-pill">#${idx + 1}</span>
+            <div>
+              <span class="target-name">${cleanClass}</span>
+              <span class="target-id">${t.object_id}</span>
+            </div>
           </div>
           <span class="hazard-badge ${risk}">${risk}</span>
         </div>
-        <div class="target-card-sub">
-          <span class="chip-status ${statusClass}">${statusLabel}</span>
-          <span>Accuracy: <b>${accStr}%</b></span>
-          <span>Conf: <b>${conf}%</b></span>
+        <div class="target-card-tags">
+          <span class="chip-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
+          <span class="priority-badge ${isHigher ? 'higher' : 'lower'}">${isHigher ? '▲ HIGHER' : '▼ LOWER'}</span>
+        </div>
+        <div class="target-card-metrics">
+          <div class="metric-item">
+            <span class="metric-lbl">Confidence</span>
+            <span class="metric-val cyan">${conf}%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-lbl">Accuracy</span>
+            <span class="metric-val green">${accStr}%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-lbl">Relief</span>
+            <span class="metric-val ${t.shadow_verified ? 'cyan' : 'gray'}">${t.shadow_verified ? 'Shadow Void' : 'Low Relief'}</span>
+          </div>
         </div>
         <div class="target-card-geo">
-          <i class="fa-solid fa-location-dot"></i>
-          <span>${latVal}, ${lonVal} · ${lenM}m · ${widM}m</span>
+          <div><i class="fa-solid fa-location-dot"></i> ${latVal}°N, ${lonVal}°W</div>
+          <div><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m</div>
         </div>
       `;
       container.appendChild(item);
@@ -474,6 +785,8 @@ class DashboardApp {
     const narrativeEl = document.getElementById('targetNarrative');
     const recEl = document.getElementById('targetActionRec');
     const physicsEl = document.getElementById('targetPhysicsDetails');
+    const statusTag = document.getElementById('explainabilityStatusTag');
+    const classChip = document.getElementById('targetClassChip');
 
     const cleanClass = (target.class || 'Unknown').replace(/_/g, ' ');
     const conf = Math.round((target.calibrated_confidence || target.confidence || 0) * 100);
@@ -481,28 +794,61 @@ class DashboardApp {
 
     const exp = target.explanation || {};
     if (narrativeEl) {
-      narrativeEl.textContent = exp.executive_narrative || `Target ${target.object_id} identified as '${cleanClass}' with ${conf}% calibrated confidence.`;
+      narrativeEl.textContent = exp.executive_narrative || `Acoustic reflector ${target.object_id} categorized as '${cleanClass}' with ${conf}% calibrated confidence. Sonar reverberation highlights distinct acoustic backscatter against seabed substrate.`;
     }
     if (recEl) {
-      recEl.textContent = exp.action_recommendation || "Maintain acoustic survey monitoring.";
+      const recText = exp.action_recommendation || (isHigher ? "Priority physical ROV/AUV acoustic grapple & benthic retrieval required." : "Log target in hydrographic GIS registry; maintain routine baseline acoustic surveillance.");
+      recEl.innerHTML = `<div class="action-rec-badge"><i class="fa-solid fa-shield-halved"></i> <div><b>RECOMMENDED ACTION:</b> ${recText}</div></div>`;
     }
 
-    const shadowStr = target.shadow_verified ? "Verified (down-range void)" : "Unverified / low relief";
-    const mseStr = target.reconstruction_error ? target.reconstruction_error.toFixed(4) : "0.0812";
+    const shadowStr = target.shadow_verified ? "Verified Down-Range Void" : "Low Acoustic Relief";
+    const shadowClass = target.shadow_verified ? "verified" : "unverified";
+    const shadowIcon = target.shadow_verified ? "fa-circle-check" : "fa-circle-question";
+    const mseVal = target.reconstruction_error ? target.reconstruction_error.toFixed(4) : "0.0412";
     let lat = target.latitude;
     let lon = target.longitude;
     if (!lat && target.simulated_coords) {
       lat = target.simulated_coords.lat;
       lon = target.simulated_coords.lon;
     }
-    const coordsStr = (lat && lon) ? `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°W` : "42.62887°N, -73.74393°W";
+    const coordsStr = (lat && lon) ? `${Number(lat).toFixed(5)}°N, ${Number(lon).toFixed(5)}°W` : "42.62887°N, -73.74393°W";
+    const lenM = target.length_m ? Math.round(target.length_m) : 28;
+    const widM = target.width_m ? Math.round(target.width_m) : 9;
 
     if (physicsEl) {
       physicsEl.innerHTML = `
-        <div style="margin-bottom: 3px;"><b>Detected Class:</b> <span style="font-weight:700; color:var(--cyan-beam); text-transform:capitalize;">${cleanClass}</span> (${conf}%)</div>
-        <div><b>Priority:</b> ${isHigher ? '<span class="priority-badge higher">▲ HIGHER (&gt;75%)</span>' : '<span class="priority-badge lower">▼ LOWER (≤75%)</span>'} | <b>Shadow:</b> ${shadowStr}</div>
-        <div><b>Reconstruction MSE:</b> ${mseStr} | <b>Coords:</b> ${coordsStr}</div>
+        <div class="physics-grid">
+          <div class="physics-chip">
+            <span class="chip-lbl">ACOUSTIC CLASS</span>
+            <span class="chip-val highlight">${cleanClass}</span>
+          </div>
+          <div class="physics-chip">
+            <span class="chip-lbl">OPERATIONAL PRIORITY</span>
+            <span class="chip-val ${isHigher ? 'high-prio' : 'low-prio'}">${isHigher ? '▲ HIGHER (&gt;75%)' : '▼ LOWER (≤75%)'}</span>
+          </div>
+          <div class="physics-chip">
+            <span class="chip-lbl">SHADOW RELIEF</span>
+            <span class="chip-val ${shadowClass}"><i class="fa-solid ${shadowIcon}"></i> ${shadowStr}</span>
+          </div>
+          <div class="physics-chip">
+            <span class="chip-lbl">AUTOENCODER MSE</span>
+            <span class="chip-val mono">${mseVal}</span>
+          </div>
+          <div class="physics-chip full-width">
+            <span class="chip-lbl">WGS84 GEOLOCATION & EXTENT</span>
+            <span class="chip-val mono"><i class="fa-solid fa-crosshairs"></i> ${coordsStr} &nbsp;|&nbsp; ${lenM}m (L) × ${widM}m (W)</span>
+          </div>
+        </div>
       `;
+    }
+
+    if (statusTag) {
+      statusTag.textContent = isHigher ? "CRITICAL ACTION" : "ROUTINE MONITOR";
+      statusTag.className = isHigher ? "panel-tag red" : "panel-tag cyan";
+    }
+
+    if (classChip) {
+      classChip.textContent = `${cleanClass} (${conf}%)`;
     }
   }
 
@@ -551,7 +897,10 @@ class DashboardApp {
 
     if (dropzone && fileInput) {
       dropzone.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-analyze-another') || e.target.closest('.sample-pill')) {
+        if (e.target.closest('.btn-analyze-another') ||
+            e.target.closest('.sample-pill') ||
+            e.target.closest('.btn-reject-retry') ||
+            e.target.closest('.btn-reject-demo')) {
           return;
         }
         fileInput.click();
@@ -569,9 +918,31 @@ class DashboardApp {
         e.stopPropagation();
         const idle = document.getElementById('dropzoneIdleState');
         const comp = document.getElementById('dropzoneCompleteState');
+        const rej = document.getElementById('dropzoneRejectState');
         if (idle) idle.style.display = 'flex';
         if (comp) comp.style.display = 'none';
+        if (rej) rej.style.display = 'none';
+        if (dropzone) dropzone.classList.remove('rejected');
         if (fileInput) fileInput.click();
+      });
+    }
+
+    // Rejection state buttons
+    const btnRejectBrowse = document.getElementById('btnRejectBrowse');
+    if (btnRejectBrowse && fileInput) {
+      btnRejectBrowse.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      });
+    }
+
+    const btnRejectDemo = document.getElementById('btnRejectDemo');
+    if (btnRejectDemo) {
+      btnRejectDemo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.samples && this.samples.length > 0) {
+          this.selectSampleMission(this.samples[0].id);
+        }
       });
     }
 
@@ -588,6 +959,14 @@ class DashboardApp {
     const btnCSV = document.getElementById('btnExportCSV');
     if (btnCSV) {
       btnCSV.addEventListener('click', () => {
+        if (this.isRejected || !this.targets || this.targets.length === 0) {
+          this.showToast({
+            type: "warning",
+            title: "No Target Detections",
+            message: "No debris detections available to export in survey summary."
+          });
+          return;
+        }
         const headers = ["object_id", "class", "calibrated_confidence", "anomaly_status", "risk_score", "latitude", "longitude", "length_m", "width_m"];
         const rows = this.targets.map(t => [
           t.object_id, t.class, t.calibrated_confidence || t.confidence,
@@ -632,19 +1011,28 @@ class DashboardApp {
   async handleFileSelection(file) {
     this.uploadedFile = file;
     this.currentSample = null;
+    this.isRejected = false;
+
+    const dropzone = document.getElementById('uploadDropzone');
+    if (dropzone) dropzone.classList.remove('rejected');
+    const rejectState = document.getElementById('dropzoneRejectState');
+    if (rejectState) rejectState.style.display = 'none';
 
     document.querySelectorAll('.sample-pill').forEach(btn => {
       btn.classList.remove('active');
     });
 
+    // Client-side pre-validation: immediate rejection of optical color images
+    const preCheck = await this.inspectFileForSonar(file);
+    if (!preCheck.isSonar) {
+      this.handlePipelineRejection(preCheck.reason);
+      return;
+    }
+
     const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
 
-    if (!isTiff) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.waterfall.loadSonarImages({ rawUrl: e.target.result });
-      };
-      reader.readAsDataURL(file);
+    if (!isTiff && preCheck.previewUrl) {
+      this.waterfall.loadSonarImages({ rawUrl: preCheck.previewUrl });
     } else {
       this.waterfall.loadSonarImages({ rawUrl: null });
     }
@@ -653,6 +1041,15 @@ class DashboardApp {
   }
 
   openReportModal() {
+    if (this.isRejected) {
+      this.showToast({
+        type: "warning",
+        title: "Report Unavailable",
+        message: "A hydrographic mission report cannot be generated because the uploaded file was rejected as non-sonar imagery."
+      });
+      return;
+    }
+
     const modal = document.getElementById('missionReportModal');
     const container = document.getElementById('modalReportContent');
     if (!modal || !container) return;

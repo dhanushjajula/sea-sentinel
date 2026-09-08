@@ -262,6 +262,18 @@ async def upload_sonar_file(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     val_res = agent.preprocessor.validate_image(destination)
+    if not val_res.get("valid"):
+        try:
+            if os.path.exists(destination):
+                os.remove(destination)
+        except Exception:
+            pass
+        reason_msg = val_res.get("reason") or val_res.get("error") or "Invalid Input: The uploaded file is not an authentic Side-Scan Sonar (SSS) acoustic image."
+        raise HTTPException(
+            status_code=400,
+            detail=reason_msg
+        )
+
     raster_meta = geotagger.read_raster_metadata(destination)
     georef_case = geotagger.classify_georef_case(raster_meta)
 
@@ -270,7 +282,8 @@ async def upload_sonar_file(file: UploadFile = File(...)):
         "filename": file.filename,
         "saved_path": destination,
         "size_bytes": os.path.getsize(destination),
-        "valid_image": val_res.get("valid", False),
+        "valid_image": True,
+        "is_sonar": True,
         "georeferencing_case": georef_case,
         "raster_metadata": raster_meta,
         "image_url": f"/static/uploads/{safe_name}"
@@ -289,6 +302,12 @@ def analyze_survey(req: AnalyzeRequest):
         image_path=req.image_path,
         raster_meta_override=req.raster_meta
     )
+
+    if res.get("status") == "rejected":
+        raise HTTPException(
+            status_code=400,
+            detail=res.get("error") or "Analysis rejected: The input is not an authentic Side-Scan Sonar (SSS) acoustic image."
+        )
 
     # Attach convenient relative URLs for frontend display
     analysis_id = res.get("analysis_id", "")
