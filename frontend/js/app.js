@@ -786,6 +786,28 @@ class DashboardApp {
 
       container.appendChild(item);
     });
+
+    // Synchronize Review System target dropdown
+    const reviewSelect = document.getElementById('reviewTargetSelect');
+    if (reviewSelect) {
+      reviewSelect.innerHTML = '';
+      if (!this.targets || this.targets.length === 0) {
+        reviewSelect.innerHTML = '<option value="">No targets detected</option>';
+      } else {
+        this.targets.forEach((t, idx) => {
+          const opt = document.createElement('option');
+          opt.value = t.object_id;
+          const cls = (t.class || 'unknown').replace(/_/g, ' ');
+          opt.textContent = `#${idx + 1} ${t.object_id} · ${cls}`;
+          reviewSelect.appendChild(opt);
+        });
+        if (this.selectedTargetId) {
+          reviewSelect.value = this.selectedTargetId;
+        } else if (this.targets.length > 0) {
+          reviewSelect.value = this.targets[0].object_id;
+        }
+      }
+    }
   }
 
   switchToMapAndFly(targetId) {
@@ -802,6 +824,16 @@ class DashboardApp {
       return;
     }
     this.selectedTargetId = targetId;
+
+    // Synchronize Review System target selection
+    const revSelect = document.getElementById('reviewTargetSelect');
+    if (revSelect && revSelect.value !== targetId) {
+      revSelect.value = targetId;
+    }
+    const revBadge = document.getElementById('reviewTargetBadge');
+    if (revBadge) {
+      revBadge.textContent = targetId;
+    }
     
     // Synchronize Target List active styling
     document.querySelectorAll('.target-card').forEach(el => {
@@ -1130,6 +1162,35 @@ class DashboardApp {
 
     if (btnSubmitFeedback) {
       btnSubmitFeedback.addEventListener('click', () => this.submitCurrentFeedback());
+    }
+
+    // 8. In-Line Target Review System (Below Survey Telemetry)
+    const reviewSelect = document.getElementById('reviewTargetSelect');
+    if (reviewSelect) {
+      reviewSelect.addEventListener('change', (e) => {
+        if (e.target.value) {
+          this.onTargetSelected(e.target.value, { fly: true, force: true });
+        }
+      });
+    }
+
+    const quickChips = document.querySelectorAll('.quick-chip');
+    const reviewBox = document.getElementById('reviewCommentBox');
+    quickChips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (reviewBox) {
+          reviewBox.value = chip.dataset.text;
+          reviewBox.focus();
+        }
+      });
+    });
+
+    const btnSubmitReview = document.getElementById('btnSubmitReviewComment');
+    if (btnSubmitReview) {
+      btnSubmitReview.addEventListener('click', () => {
+        this.submitInlineReviewComment();
+      });
     }
   }
 
@@ -1484,6 +1545,96 @@ class DashboardApp {
         statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
         statusMsg.textContent = err.message || 'Failed to submit feedback.';
       }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origBtnText;
+      }
+    }
+  }
+
+  async submitInlineReviewComment() {
+    const selectEl = document.getElementById('reviewTargetSelect');
+    const commentBox = document.getElementById('reviewCommentBox');
+    const statusMsg = document.getElementById('reviewStatusMsg');
+    const submitBtn = document.getElementById('btnSubmitReviewComment');
+
+    const targetId = (selectEl && selectEl.value) || this.selectedTargetId;
+    if (!targetId) {
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg error';
+        statusMsg.textContent = 'Please select a target to review.';
+      }
+      return;
+    }
+
+    const comment = commentBox ? commentBox.value.trim() : '';
+    if (!comment) {
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg error';
+        statusMsg.textContent = 'Please enter natural-language feedback or click a quick tag.';
+      }
+      return;
+    }
+
+    const target = this.targets.find(t => String(t.object_id) === String(targetId));
+    if (!target) return;
+
+    const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+    }
+
+    try {
+      const analysisId = (this.currentAnalysisResult && this.currentAnalysisResult.analysis_id) || "latest";
+      const res = await window.apiService.submitFeedback(
+        analysisId,
+        target.object_id,
+        comment
+      );
+
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg success';
+        statusMsg.innerHTML = `<i class="fa-solid fa-circle-check"></i> <b>Learned:</b> Reclassified as <b>${res.corrected_class.replace(/_/g, ' ')}</b>. Saved to memory.`;
+      }
+
+      // Update local target record
+      target.original_model_class = res.original_class;
+      target.class = res.corrected_class;
+      target.class_id = res.corrected_class_id;
+      target.memory_corrected = true;
+      if (res.target && res.target.priority_level) {
+        target.priority_level = res.target.priority_level;
+        target.priority_label = res.target.priority_label;
+      }
+
+      if (commentBox) commentBox.value = '';
+
+      // Re-render target cards to reflect new class and memory badge
+      this.renderTargetList();
+      this.onTargetSelected(target.object_id, { fly: false, force: true });
+
+      this.showToast({
+        type: "success",
+        title: "Correction Stored in Memory",
+        message: `YOLO learned '${res.original_class}' → '${res.corrected_class}'. Future similar detections will be corrected automatically.`
+      });
+
+      setTimeout(() => {
+        if (statusMsg) statusMsg.style.display = 'none';
+      }, 5000);
+
+    } catch (err) {
+      console.error("Inline feedback error:", err);
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg error';
+        statusMsg.textContent = err.message || 'Failed to submit feedback.';
+      }
+    } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = origBtnText;
