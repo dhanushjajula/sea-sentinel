@@ -62,3 +62,5 @@ outputs/*
 Thumbs.db
 .vscode/
 .idea/
+*.cache
+yolo11n.pt

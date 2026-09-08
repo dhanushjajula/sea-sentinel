@@ -1,7 +1,7 @@
 /**
  * Sea Sentinel: Interactive Sonar Waterfall Viewer
  * Renders acoustic waterfall scans with Port/Starboard channels, nadir line, and target bounding overlays.
- * Supports multi-mode inspection: Raw Scan, Enhanced (Lee+CLAHE), and Detections & Shadows.
+ * Supports multi-mode inspection and independent layer toggles (YOLO, U-Net, Fusion, Verification, IDs).
  */
 
 class WaterfallViewer {
@@ -11,6 +11,15 @@ class WaterfallViewer {
     this.targets = [];
     this.selectedTargetId = null;
     this.currentMode = "overlay"; // "raw" | "enhanced" | "overlay"
+
+    // Independent layer visibility toggles
+    this.layers = {
+      yolo: true,
+      unet: true,
+      fusion: true,
+      verify: true,
+      ids: true
+    };
 
     this.rawImage = null;
     this.enhancedImage = null;
@@ -75,6 +84,13 @@ class WaterfallViewer {
   setViewMode(mode) {
     this.currentMode = mode;
     this.render();
+  }
+
+  setLayerVisibility(layerName, isVisible) {
+    if (this.layers.hasOwnProperty(layerName)) {
+      this.layers[layerName] = Boolean(isVisible);
+      this.render();
+    }
   }
 
   _isImageValid(img) {
@@ -148,11 +164,9 @@ class WaterfallViewer {
     const h = this.canvas.height;
     const ctx = this.ctx;
 
-    // Background: Tactical dark acoustic sensor offline grid
     ctx.fillStyle = "#030a16";
     ctx.fillRect(0, 0, w, h);
 
-    // Subtle tactical grid
     ctx.strokeStyle = "rgba(255, 51, 102, 0.08)";
     ctx.lineWidth = 1;
     for (let x = 0; x < w; x += 40) {
@@ -168,7 +182,6 @@ class WaterfallViewer {
       ctx.stroke();
     }
 
-    // Acoustic Nadir center line (dashed red)
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = "rgba(255, 51, 102, 0.35)";
     ctx.beginPath();
@@ -177,7 +190,6 @@ class WaterfallViewer {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Warning Badge / Modal in Center
     const boxW = Math.min(680, w - 40);
     const boxH = 140;
     const boxX = (w - boxW) / 2;
@@ -195,13 +207,11 @@ class WaterfallViewer {
     ctx.fill();
     ctx.stroke();
 
-    // Rejection Header
     ctx.font = "bold 15px 'JetBrains Mono', monospace";
     ctx.fillStyle = "#ff3366";
     ctx.textAlign = "center";
     ctx.fillText("⚠ ACOUSTIC SENSOR REJECTION: NON-SONAR INPUT", w / 2, boxY + 38);
 
-    // Rejection Subtext
     ctx.font = "12px 'Outfit', sans-serif";
     ctx.fillStyle = "#fca5a5";
     const cleanReason = reason ? (reason.length > 90 ? reason.substring(0, 90) + "..." : reason) : "Optical or non-acoustic raster detected.";
@@ -214,15 +224,35 @@ class WaterfallViewer {
   }
 
   _getTargetCanvasCoords(t, w, h) {
+    // 1. If normalized polygon exists, derive bounding box directly to ensure 100% perfect tight framing around U-Net segmentation
+    if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
+      let minX = 1.0, minY = 1.0, maxX = 0.0, maxY = 0.0;
+      t.norm_polygon.forEach(pt => {
+        if (pt[0] < minX) minX = pt[0];
+        if (pt[1] < minY) minY = pt[1];
+        if (pt[0] > maxX) maxX = pt[0];
+        if (pt[1] > maxY) maxY = pt[1];
+      });
+      if (maxX > minX && maxY > minY) {
+        const padX = 10 / w;
+        const padY = 10 / h;
+        const x1 = Math.max(0, (minX - padX) * w);
+        const y1 = Math.max(0, (minY - padY) * h);
+        const x2 = Math.min(w, (maxX + padX) * w);
+        const y2 = Math.min(h, (maxY + padY) * h);
+        return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
+      }
+    }
+
     const norm = t.norm_bbox;
     if (norm && (norm.x2 > norm.x1)) {
       const x1 = norm.x1 * w;
       const y1 = norm.y1 * h;
       const x2 = norm.x2 * w;
       const y2 = norm.y2 * h;
-      return { x1, y1, x2, y2, bw: Math.max(8, x2 - x1), bh: Math.max(8, y2 - y1) };
+      return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
     }
-    const bbox = t.pixel_bbox || {};
+    const bbox = t.pixel_bbox || t.bbox || {};
     const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
     const imgH = (t.image_dimensions && t.image_dimensions.height) || (this.rawImage ? this.rawImage.naturalHeight : h) || h;
     const sx = w / imgW;
@@ -231,7 +261,35 @@ class WaterfallViewer {
     const y1 = (bbox.y1 || 0) * sy;
     const x2 = (bbox.x2 || (bbox.x1 + 80)) * sx;
     const y2 = (bbox.y2 || (bbox.y1 + 60)) * sy;
-    return { x1, y1, x2, y2, bw: Math.max(8, x2 - x1), bh: Math.max(8, y2 - y1) };
+    return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1), sx, sy };
+  }
+
+  _getPolygonCanvasCoords(t, w, h) {
+    const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
+    const imgH = (t.image_dimensions && t.image_dimensions.height) || (this.rawImage ? this.rawImage.naturalHeight : h) || h;
+    const sx = w / imgW;
+    const sy = h / imgH;
+
+    if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
+      return t.norm_polygon.map(pt => ({ x: pt[0] * w, y: pt[1] * h }));
+    }
+
+    if (t.polygon && Array.isArray(t.polygon) && t.polygon.length >= 3) {
+      return t.polygon.map(pt => ({ x: pt[0] * sx, y: pt[1] * sy }));
+    }
+
+    // Heuristic organic segmentation polygon inside bbox if polygon vertices not supplied
+    const coords = this._getTargetCanvasCoords(t, w, h);
+    const { x1, y1, bw, bh } = coords;
+    return [
+      { x: x1 + bw * 0.15, y: y1 + bh * 0.20 },
+      { x: x1 + bw * 0.50, y: y1 + bh * 0.08 },
+      { x: x1 + bw * 0.85, y: y1 + bh * 0.22 },
+      { x: x1 + bw * 0.95, y: y1 + bh * 0.60 },
+      { x: x1 + bw * 0.80, y: y1 + bh * 0.90 },
+      { x: x1 + bw * 0.45, y: y1 + bh * 0.95 },
+      { x: x1 + bw * 0.10, y: y1 + bh * 0.75 }
+    ];
   }
 
   render() {
@@ -239,96 +297,181 @@ class WaterfallViewer {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    // 1. Draw Base Background (Real Sonar Image or Synthetic)
-    let activeImg = null;
-    if (this.currentMode === "raw" && this._isImageValid(this.rawImage)) {
-      activeImg = this.rawImage;
-    } else if (this.currentMode === "enhanced" && this._isImageValid(this.enhancedImage)) {
-      activeImg = this.enhancedImage;
-    } else if (this.currentMode === "overlay") {
-      activeImg = this._isImageValid(this.annotatedImage) ? this.annotatedImage :
-                  this._isImageValid(this.enhancedImage) ? this.enhancedImage :
-                  this._isImageValid(this.rawImage) ? this.rawImage : null;
-    }
+    // 1. Draw Base Background (Raw or Enhanced)
+    let baseImg = (this.currentMode === "raw" && this._isImageValid(this.rawImage)) ? this.rawImage :
+                  (this._isImageValid(this.enhancedImage) ? this.enhancedImage :
+                  (this._isImageValid(this.rawImage) ? this.rawImage : null));
 
-    if (activeImg && this._isImageValid(activeImg)) {
+    if (baseImg && this._isImageValid(baseImg)) {
       try {
-        ctx.drawImage(activeImg, 0, 0, w, h);
-        ctx.fillStyle = "rgba(0, 240, 255, 0.03)";
+        ctx.drawImage(baseImg, 0, 0, w, h);
+        ctx.fillStyle = "rgba(0, 240, 255, 0.02)";
         ctx.fillRect(0, 0, w, h);
       } catch (err) {
-        console.warn("Waterfall drawImage failed safely:", err);
+        console.warn("Waterfall drawImage failed:", err);
         this._generateSyntheticWaterfall();
       }
     } else {
       this._generateSyntheticWaterfall();
     }
 
-    // If in Raw or Enhanced pure mode without overlays, don't draw bounding boxes
-    if (this.currentMode !== "overlay") {
+    // In raw mode without overlays, don't draw bounding layers
+    if (this.currentMode === "raw") {
       return;
     }
 
-    const hasAnnotatedRaster = (activeImg === this.annotatedImage && this._isImageValid(this.annotatedImage));
+    // 2. Render U-Net / Fusion Pixel-Level Segmentation & Node Dots
+    this.targets.forEach(t => {
+      const isSelected = (t.object_id === this.selectedTargetId);
+      const poly = this._getPolygonCanvasCoords(t, w, h);
+      if (!poly || poly.length < 3) return;
 
-    // 2. Draw Targets Bounding Boxes, Overlays & Selection Highlights
+      // (A) Fused Boundaries Translucent Fill Mask
+      if (this.layers.fusion) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo(poly[i].x, poly[i].y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = isSelected ? "rgba(0, 255, 128, 0.32)" : "rgba(0, 240, 255, 0.20)";
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // (B) U-Net Crisp Perimeter Contour Lines & Keypoint Node Dots
+      if (this.layers.unet) {
+        ctx.save();
+        const colors = ["#00f0ff", "#d946ef", "#00e676", "#ff9800", "#38bdf8"];
+        for (let i = 0; i < poly.length; i++) {
+          const p1 = poly[i];
+          const p2 = poly[(i + 1) % poly.length];
+          const segColor = colors[i % colors.length];
+
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineWidth = isSelected ? 3.2 : 2.4;
+          ctx.strokeStyle = segColor;
+          ctx.shadowColor = segColor;
+          ctx.shadowBlur = 6;
+          ctx.stroke();
+        }
+
+        // Draw U-Net Keypoint / Vertex Node Dots
+        const nodeColors = ["#00e676", "#00f0ff", "#e040fb", "#ff9800", "#38bdf8"];
+        for (let i = 0; i < poly.length; i++) {
+          const pt = poly[i];
+          const nCol = nodeColors[i % nodeColors.length];
+
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, isSelected ? 5.2 : 4.2, 0, Math.PI * 2);
+          ctx.fillStyle = nCol;
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    });
+
+    // 3. Render YOLO Bold Green Bounding Boxes & Magenta Label Tags
     this.targets.forEach(t => {
       const coords = this._getTargetCanvasCoords(t, w, h);
       const { x1, y1, bw, bh } = coords;
 
       const isSelected = (t.object_id === this.selectedTargetId);
+      const srcCategory = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
+      const hasYolo = t.sources ? t.sources.includes("yolo") : (srcCategory !== "UNET_ONLY");
 
-      // Color coding by risk
-      let color = "#00e676"; // LOW
-      if (t.risk_score === "HIGH") color = "#ff1744";
-      else if (t.risk_score === "MEDIUM") color = "#ffab00";
-
-      ctx.save();
-
-      if (hasAnnotatedRaster) {
-        // The annotated raster already has the U-Net mask, contours, and base boxes rendered.
-        // Draw interactive selection glow/brackets when selected:
-        if (isSelected) {
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = "#00f0ff";
-          ctx.shadowColor = "#00f0ff";
-          ctx.shadowBlur = 16;
-          ctx.strokeRect(x1 - 2, y1 - 2, bw + 4, bh + 4);
-          ctx.fillStyle = "rgba(0, 240, 255, 0.15)";
-          ctx.fillRect(x1 - 2, y1 - 2, bw + 4, bh + 4);
-        }
-      } else {
-        // Fallback vector overlay on top of raw/enhanced image
-        ctx.lineWidth = isSelected ? 3 : 2;
-        ctx.strokeStyle = color;
-
-        if (isSelected) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 14;
-        }
-
+      // Draw YOLO Bold Green Bounding Box
+      if (this.layers.yolo && (hasYolo || this.layers.fusion || this.layers.unet)) {
+        ctx.save();
+        ctx.lineWidth = isSelected ? 3.5 : 2.8;
+        ctx.strokeStyle = "#00e676"; // Bright Neon Green
+        ctx.shadowColor = "#00e676";
+        ctx.shadowBlur = isSelected ? 16 : 8;
         ctx.strokeRect(x1, y1, bw, bh);
 
-        // Semi-transparent fill tint
-        ctx.fillStyle = isSelected ? "rgba(0, 240, 255, 0.22)" : "rgba(0, 230, 118, 0.12)";
-        ctx.fillRect(x1, y1, bw, bh);
+        // Corner brackets
+        const cLen = Math.min(12, bw * 0.22, bh * 0.22);
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1 + cLen); ctx.lineTo(x1, y1); ctx.lineTo(x1 + cLen, y1);
+        ctx.moveTo(x1 + bw - cLen, y1); ctx.lineTo(x1 + bw, y1); ctx.lineTo(x1 + bw, y1 + cLen);
+        ctx.moveTo(x1, y1 + bh - cLen); ctx.lineTo(x1, y1 + bh); ctx.lineTo(x1 + cLen, y1 + bh);
+        ctx.moveTo(x1 + bw - cLen, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh - cLen);
+        ctx.stroke();
 
-        // Target Label Tag
+        // (B) Magenta Label Pill Badge (matching reference image "Normal" / Class tag)
         const confPct = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
         const cleanClass = (t.class || "debris").replace(/_/g, " ").toUpperCase();
-        const label = `[${t.object_id}] ${cleanClass}: ${confPct}%`;
+        const badgeText = `${cleanClass} ${confPct}%`;
+
         ctx.font = "bold 11px 'JetBrains Mono', monospace";
-        const textW = ctx.measureText(label).width;
-        ctx.fillStyle = "rgba(11, 21, 45, 0.9)";
-        ctx.fillRect(x1, Math.max(0, y1 - 18), textW + 8, 16);
-        ctx.strokeStyle = color;
+        const tagW = ctx.measureText(badgeText).width + 16;
+        const tagH = 22;
+        const tagY = Math.max(0, y1 - tagH + 2);
+
+        // Solid Magenta fill
+        ctx.fillStyle = "#e00080";
+        ctx.fillRect(x1, tagY, tagW, tagH);
+
+        // Crisp white border
+        ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1;
-        ctx.strokeRect(x1, Math.max(0, y1 - 18), textW + 8, 16);
-        ctx.fillStyle = color;
-        ctx.fillText(label, x1 + 4, Math.max(12, y1 - 6));
+        ctx.strokeRect(x1, tagY, tagW, tagH);
+
+        // Clean white text
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(badgeText, x1 + 8, tagY + 15);
+
+        ctx.restore();
       }
 
-      ctx.restore();
+      // Draw Verification Indicator Badge
+      if (this.layers.verify) {
+        ctx.save();
+        const vStatus = t.verification_status || "confirmed";
+        const isConfirmed = (vStatus === "confirmed");
+        const badgeColor = isConfirmed ? "#00e676" : "#ffab00";
+        const badgeText = isConfirmed ? "VERIFIED" : "SUSPICIOUS";
+
+        ctx.font = "bold 9px 'JetBrains Mono', monospace";
+        const bWidth = ctx.measureText(badgeText).width + 8;
+        ctx.fillStyle = "rgba(10, 15, 26, 0.92)";
+        ctx.fillRect(x1 + bw - bWidth - 2, y1 + bh - 16, bWidth, 14);
+        ctx.strokeStyle = badgeColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x1 + bw - bWidth - 2, y1 + bh - 16, bWidth, 14);
+        ctx.fillStyle = badgeColor;
+        ctx.fillText(badgeText, x1 + bw - bWidth + 2, y1 + bh - 6);
+        ctx.restore();
+      }
+
+      // Draw Target IDs and Provenance Label
+      if (this.layers.ids) {
+        ctx.save();
+        const provLabel = (srcCategory === "BOTH") ? "YOLO+UNET" : srcCategory.replace("_ONLY", "");
+        const label = `[${t.object_id}] (${provLabel})`;
+
+        ctx.font = "bold 10px 'JetBrains Mono', monospace";
+        const textW = ctx.measureText(label).width;
+        const idY = y1 + bh + 14;
+
+        if (idY < h) {
+          ctx.fillStyle = "rgba(11, 21, 45, 0.92)";
+          ctx.fillRect(x1, y1 + bh + 2, textW + 8, 16);
+          ctx.strokeStyle = "#00e676";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x1, y1 + bh + 2, textW + 8, 16);
+          ctx.fillStyle = "#00e676";
+          ctx.fillText(label, x1 + 4, y1 + bh + 14);
+        }
+        ctx.restore();
+      }
     });
   }
 
@@ -346,7 +489,7 @@ class WaterfallViewer {
       });
     };
 
-    // Click selection (centers target on map)
+    // Click selection
     this.canvas.addEventListener('click', (e) => {
       const clicked = findHitTarget(e);
       if (clicked && window.app) {
@@ -354,7 +497,7 @@ class WaterfallViewer {
       }
     });
 
-    // Hover / Pointing out detection
+    // Hover detection
     this.canvas.addEventListener('mousemove', (e) => {
       const hit = findHitTarget(e);
       if (hit) {

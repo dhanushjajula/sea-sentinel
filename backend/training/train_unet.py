@@ -14,6 +14,7 @@ import argparse
 import json
 import time
 from typing import Dict, Any, Tuple
+import glob
 import numpy as np
 import cv2
 import torch
@@ -240,8 +241,27 @@ def train(args):
         demo_dir = os.path.join(PROJECT_ROOT, "outputs", "segmentation", "demo_dataset")
         img_paths, mask_paths = generate_synthetic_demo_data(demo_dir, num_samples=32, img_size=args.img_size)
     else:
-        # Load from verified directory
-        pass
+        found_imgs = audit.get("sample_images", [])
+        # Get all paired stems from data_dir
+        seg_img_dir = os.path.join(args.data_dir, "images") if os.path.exists(os.path.join(args.data_dir, "images")) else args.data_dir
+        seg_mask_dir = os.path.join(args.data_dir, "masks") if os.path.exists(os.path.join(args.data_dir, "masks")) else args.data_dir
+        
+        all_imgs = glob.glob(os.path.join(seg_img_dir, "**", "*.*"), recursive=True)
+        img_paths = []
+        mask_paths = []
+        for imp in all_imgs:
+            if not imp.lower().endswith((".png", ".jpg", ".jpeg", ".tif")):
+                continue
+            base = os.path.splitext(os.path.basename(imp))[0]
+            # search for corresponding mask
+            mask_cands = glob.glob(os.path.join(seg_mask_dir, "**", f"{base}.*"), recursive=True)
+            if mask_cands:
+                img_paths.append(imp)
+                mask_paths.append(mask_cands[0])
+
+    if len(img_paths) == 0:
+        print("[ERROR] No paired image-mask samples found for training.")
+        return
 
     # Train / Val Split
     total_samples = len(img_paths)

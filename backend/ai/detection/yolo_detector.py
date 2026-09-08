@@ -1,10 +1,12 @@
 """
 Layer 3: YOLO Debris Detection Core
 Integrates Ultralytics YOLOv11/v8 for candidate region detection on Side-Scan Sonar imagery.
-Supports configurable confidence thresholds, NMS filtering, and bounding box extraction.
+Supports configurable confidence thresholds, high-recall candidate extraction,
+NMS filtering, and standardized candidate object schema.
 """
 from typing import Dict, Any, List, Optional, Tuple, Union
 import os
+import time
 import cv2
 import numpy as np
 
@@ -14,6 +16,7 @@ try:
 except ImportError:
     ULTRALYTICS_AVAILABLE = False
 
+
 class YOLODetector:
     """
     Side-Scan Sonar Object Detector powered by Ultralytics YOLO.
@@ -21,7 +24,7 @@ class YOLODetector:
     def __init__(
         self,
         model_path: Optional[str] = None,
-        conf_thresh: float = 0.35,
+        conf_thresh: float = 0.25, # High-recall threshold
         iou_thresh: float = 0.45,
         device: str = "cpu"
     ):
@@ -32,7 +35,7 @@ class YOLODetector:
         self.model = None
         self.is_model_loaded = False
 
-        # Harmonized classes
+        # Harmonized 5 debris classes
         self.classes = {
             0: "fishing_net",
             1: "pipeline_or_cable",
@@ -58,7 +61,8 @@ class YOLODetector:
                 if hasattr(self.model, "names") and self.model.names:
                     # Update classes if custom trained
                     self.classes = {int(k): v for k, v in self.model.names.items()}
-            except Exception:
+            except Exception as e:
+                print(f"[YOLODetector] Warning: Failed to load weights from {self.model_path}: {e}")
                 self.is_model_loaded = False
         else:
             self.is_model_loaded = False
@@ -66,14 +70,17 @@ class YOLODetector:
     def detect(
         self,
         image_input: Union[str, np.ndarray],
-        conf_override: Optional[float] = None
+        conf_override: Optional[float] = None,
+        tile_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Runs object detection on sonar image or tile.
+        Runs high-recall object detection on sonar image or tile.
         Returns:
-          - detections: list of dicts with bbox, class, confidence
-          - model_loaded: boolean indicating real weights vs. untrained status
+          - detections: list of dicts with bbox, class, confidence, centroid, source="yolo"
+          - model_loaded: boolean
+          - inference_time_ms: float
         """
+        t0 = time.perf_counter()
         conf = conf_override if conf_override is not None else self.conf_thresh
 
         if not self.is_model_loaded:
@@ -82,17 +89,28 @@ class YOLODetector:
                 "message": "Trained YOLO weights not found. Use training/train_yolo.py to train on the SSS dataset.",
                 "model_loaded": False,
                 "confidence_threshold": conf,
-                "detections": []
+                "detections": [],
+                "inference_time_ms": 0.0
             }
 
-        # Run real Ultralytics inference
-        results = self.model.predict(
-            source=image_input,
-            conf=conf,
-            iou=self.iou_thresh,
-            device=self.device,
-            verbose=False
-        )
+        try:
+            # Run real Ultralytics inference
+            results = self.model.predict(
+                source=image_input,
+                conf=conf,
+                iou=self.iou_thresh,
+                device=self.device,
+                verbose=False
+            )
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"YOLO inference failed: {str(e)}",
+                "model_loaded": self.is_model_loaded,
+                "confidence_threshold": conf,
+                "detections": [],
+                "inference_time_ms": round((time.perf_counter() - t0) * 1000, 2)
+            }
 
         detections = []
         det_id = 1
@@ -106,28 +124,165 @@ class YOLODetector:
                 xyxy = box.xyxy[0].cpu().numpy()
                 conf_val = float(box.conf[0].cpu().numpy())
                 cls_idx = int(box.cls[0].cpu().numpy())
-                cls_name = self.classes.get(cls_idx, "unknown_debris")
+                cls_name = self.classes.get(cls_idx, "marine_debris")
 
-                detections.append({
-                    "object_id": f"TGT_{det_id:03d}",
-                    "bbox": {
-                        "x1": round(float(xyxy[0]), 1),
-                        "y1": round(float(xyxy[1]), 1),
-                        "x2": round(float(xyxy[2]), 1),
-                        "y2": round(float(xyxy[3]), 1)
-                    },
-                    "confidence": round(conf_val, 3),
+                x1 = round(float(xyxy[0]), 1)
+                y1 = round(float(xyxy[1]), 1)
+                x2 = round(float(xyxy[2]), 1)
+                y2 = round(float(xyxy[3]), 1)
+                bw = max(1.0, x2 - x1)
+                bh = max(1.0, y2 - y1)
+                cx = round(x1 + bw / 2.0, 1)
+                cy = round(y1 + bh / 2.0, 1)
+
+                det_record = {
+                    "object_id": f"YOLO_{det_id:03d}" if not tile_id else f"{tile_id}_YOLO_{det_id:03d}",
+                    "source": "yolo",
+                    "model": "YOLOv11",
                     "class": cls_name,
-                    "class_id": cls_idx
-                })
+                    "class_id": cls_idx,
+                    "confidence": round(conf_val, 3),
+                    "bbox": {
+                        "x1": x1,
+                        "y1": y1,
+                        "x2": x2,
+                        "y2": y2
+                    },
+                    "width": round(bw, 1),
+                    "height": round(bh, 1),
+                    "center": [cx, cy],
+                    "centroid": [cx, cy]
+                }
+                if tile_id:
+                    det_record["tile_id"] = tile_id
+
+                detections.append(det_record)
                 det_id += 1
+
+        inference_time_ms = round((time.perf_counter() - t0) * 1000, 2)
 
         return {
             "status": "success",
             "model_loaded": True,
             "confidence_threshold": conf,
-            "detections": detections
+            "detections": detections,
+            "total_detections": len(detections),
+            "inference_time_ms": inference_time_ms
         }
+
+    def detect_batch(
+        self,
+        image_inputs: List[np.ndarray],
+        tile_ids: Optional[List[str]] = None,
+        conf_override: Optional[float] = None,
+        batch_size: int = 16
+    ) -> List[Dict[str, Any]]:
+        """
+        Runs batched high-recall object detection on a list of tiles or images.
+        Returns a list of detection result dictionaries, one per input image.
+        """
+        if not image_inputs:
+            return []
+
+        t0 = time.perf_counter()
+        conf = conf_override if conf_override is not None else self.conf_thresh
+
+        if not self.is_model_loaded:
+            return [
+                {
+                    "status": "model_unavailable",
+                    "detections": [],
+                    "total_detections": 0,
+                    "inference_time_ms": 0.0,
+                    "tile_id": tile_ids[i] if tile_ids and i < len(tile_ids) else None
+                }
+                for i in range(len(image_inputs))
+            ]
+
+        batch_outputs = []
+        try:
+            # Run batched Ultralytics inference
+            results = self.model.predict(
+                source=image_inputs,
+                conf=conf,
+                iou=self.iou_thresh,
+                device=self.device,
+                batch=min(batch_size, len(image_inputs)),
+                verbose=False
+            )
+        except Exception as e:
+            # Fallback on per-image error
+            return [
+                {
+                    "status": "error",
+                    "message": str(e),
+                    "detections": [],
+                    "total_detections": 0,
+                    "inference_time_ms": 0.0,
+                    "tile_id": tile_ids[i] if tile_ids and i < len(tile_ids) else None
+                }
+                for i in range(len(image_inputs))
+            ]
+
+        total_ms = round((time.perf_counter() - t0) * 1000, 2)
+        avg_ms_per_tile = round(total_ms / max(1, len(image_inputs)), 2)
+
+        for i, r in enumerate(results):
+            tile_id = tile_ids[i] if tile_ids and i < len(tile_ids) else None
+            detections = []
+            boxes = r.boxes
+            if boxes is not None:
+                det_id = 1
+                for box in boxes:
+                    xyxy = box.xyxy[0].cpu().numpy()
+                    conf_val = float(box.conf[0].cpu().numpy())
+                    cls_idx = int(box.cls[0].cpu().numpy())
+                    cls_name = self.classes.get(cls_idx, "marine_debris")
+
+                    x1 = round(float(xyxy[0]), 1)
+                    y1 = round(float(xyxy[1]), 1)
+                    x2 = round(float(xyxy[2]), 1)
+                    y2 = round(float(xyxy[3]), 1)
+                    bw = max(1.0, x2 - x1)
+                    bh = max(1.0, y2 - y1)
+                    cx = round(x1 + bw / 2.0, 1)
+                    cy = round(y1 + bh / 2.0, 1)
+
+                    det_record = {
+                        "object_id": f"{tile_id}_YOLO_{det_id:03d}" if tile_id else f"YOLO_{det_id:03d}",
+                        "source": "yolo",
+                        "model": "YOLOv11",
+                        "class": cls_name,
+                        "class_id": cls_idx,
+                        "confidence": round(conf_val, 3),
+                        "bbox": {
+                            "x1": x1,
+                            "y1": y1,
+                            "x2": x2,
+                            "y2": y2
+                        },
+                        "width": round(bw, 1),
+                        "height": round(bh, 1),
+                        "center": [cx, cy],
+                        "centroid": [cx, cy]
+                    }
+                    if tile_id:
+                        det_record["tile_id"] = tile_id
+
+                    detections.append(det_record)
+                    det_id += 1
+
+            batch_outputs.append({
+                "status": "success",
+                "model_loaded": True,
+                "confidence_threshold": conf,
+                "tile_id": tile_id,
+                "detections": detections,
+                "total_detections": len(detections),
+                "inference_time_ms": avg_ms_per_tile
+            })
+
+        return batch_outputs
 
     def draw_detections(
         self,
@@ -138,6 +293,9 @@ class YOLODetector:
         """
         Draws bounding boxes and class labels directly onto the image canvas.
         """
+        if image is None:
+            return image
+
         annotated = image.copy()
         if len(annotated.shape) == 2:
             annotated = cv2.cvtColor(annotated, cv2.COLOR_GRAY2BGR)
@@ -152,9 +310,11 @@ class YOLODetector:
         colors = color_map or default_colors
 
         for d in detections:
-            bbox = d["bbox"]
-            x1, y1 = int(bbox["x1"]), int(bbox["y1"])
-            x2, y2 = int(bbox["x2"]), int(bbox["y2"])
+            bbox = d.get("bbox", {})
+            if not bbox:
+                continue
+            x1, y1 = int(bbox.get("x1", 0)), int(bbox.get("y1", 0))
+            x2, y2 = int(bbox.get("x2", 0)), int(bbox.get("y2", 0))
             cls_name = d.get("class", "debris")
             conf = d.get("confidence", 0.0)
 

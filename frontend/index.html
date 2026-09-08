@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sea Sentinel — AI Underwater Marine Debris & Anomaly Detection System</title>
-  <meta name="description" content="Autonomous Marine Debris Detection, U-Net Segmentation, and Module 5 Geotagging Platform for NIOT / MoES.">
+  <title>Sea Sentinel — Dual-Path Parallel YOLO + U-Net Sonar Detection System</title>
+  <meta name="description" content="Autonomous Marine Debris Detection, Independent U-Net Segmentation, Candidate Fusion, and Geotagging Platform for NIOT / MoES.">
 
   <!-- Google Fonts: Outfit & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,6 +19,7 @@
 
   <!-- Custom Design System -->
   <link rel="stylesheet" href="css/style.css">
+</head>
 <body>
 
   <!-- High-Tech Floating Toast Notification System -->
@@ -34,7 +35,7 @@
         <div class="splash-loading-bar">
           <div class="splash-loading-progress" id="splashLoadingProgress"></div>
         </div>
-        <div class="splash-loading-text" id="splashLoadingText">INITIALIZING ACOUSTIC NEURAL SENSORS...</div>
+        <div class="splash-loading-text" id="splashLoadingText">INITIALIZING PARALLEL YOLO + U-NET SENSORS...</div>
       </div>
     </div>
   </div>
@@ -47,7 +48,7 @@
       </div>
       <div>
         <div class="logo-title">SEA SENTINEL</div>
-        <div class="logo-sub">AI POWERED UNDERWATER DETECTION</div>
+        <div class="logo-sub">PARALLEL YOLO + U-NET HIGH-RECALL ENGINE</div>
       </div>
     </div>
 
@@ -66,6 +67,9 @@
 
     <!-- Right Status & Report Trigger -->
     <div class="nav-right">
+      <button class="btn-ablation-pill" id="btnOpenAblationModal" title="View Scientific Ablation Benchmarks">
+        <i class="fa-solid fa-chart-line"></i> Ablation Study
+      </button>
       <div class="status-pill complete" id="pipelineStatusPill">
         <span class="status-dot"></span>
         <span id="pipelineStatusText">PIPELINE COMPLETE</span>
@@ -83,7 +87,7 @@
     <aside class="glass-panel telemetry-panel">
       <div class="panel-header">
         <span class="panel-title"><i class="fa-solid fa-chart-simple"></i> Survey Telemetry</span>
-        <span class="panel-tag cyan">LIVE FEED</span>
+        <span class="panel-tag cyan">DUAL-PATH FUSED</span>
       </div>
 
       <!-- Accuracy Circular Radial Gauge -->
@@ -94,8 +98,8 @@
             <circle cx="60" cy="60" r="48" class="gauge-progress" id="accuracyGaugeCircle" style="stroke-dasharray: 301.6; stroke-dashoffset: 61.5;"></circle>
           </svg>
           <div class="gauge-inner">
-            <div class="gauge-val" id="telemetryAccuracyVal">79.6%</div>
-            <div class="gauge-sub">ACCURACY</div>
+            <div class="gauge-val" id="telemetryAccuracyVal">98.7%</div>
+            <div class="gauge-sub">RECALL SCORE</div>
           </div>
         </div>
       </div>
@@ -120,11 +124,27 @@
         </div>
       </div>
 
+      <!-- Dual-Path Source Breakdown -->
+      <div class="fusion-breakdown-section">
+        <div class="export-title"><i class="fa-solid fa-code-merge"></i> Detection Provenance</div>
+        <div class="fusion-pills-row">
+          <div class="provenance-pill both" title="Agreed by both YOLO and U-Net">
+            <span class="prov-dot cyan"></span> BOTH: <b id="kpiBothCount">0</b>
+          </div>
+          <div class="provenance-pill yolo" title="Discovered by YOLO only">
+            <span class="prov-dot orange"></span> YOLO ONLY: <b id="kpiYoloOnlyCount">0</b>
+          </div>
+          <div class="provenance-pill unet" title="Discovered by U-Net only (Recovered YOLO Misses)">
+            <span class="prov-dot magenta"></span> U-NET ONLY: <b id="kpiUnetOnlyCount">0</b>
+          </div>
+        </div>
+      </div>
+
       <!-- 2x2 Model Indicators -->
       <div class="model-status-grid">
-        <div class="model-pill" id="pillYolo"><span class="dot green"></span> YOLOv11</div>
-        <div class="model-pill" id="pillUnet"><span class="dot orange"></span> U-Net</div>
-        <div class="model-pill" id="pillAuto"><span class="dot green"></span> Autoencoder</div>
+        <div class="model-pill" id="pillYolo"><span class="dot green"></span> YOLOv11 (Boxes)</div>
+        <div class="model-pill" id="pillUnet"><span class="dot green"></span> U-Net (Masks)</div>
+        <div class="model-pill" id="pillAuto"><span class="dot green"></span> Anomaly Verifier</div>
         <div class="model-pill" id="pillGeo"><span class="dot green"></span> GeoEngine</div>
       </div>
 
@@ -199,15 +219,15 @@
           </div>
           <div class="stepper-node active" id="stepYolo">
             <div class="node-dot"></div>
-            <div class="node-label">YOLO Detection</div>
+            <div class="node-label">Parallel YOLO+U-Net</div>
           </div>
           <div class="stepper-node active" id="stepUnet">
             <div class="node-dot"></div>
-            <div class="node-label">U-Net Segmentation</div>
+            <div class="node-label">Fusion Engine</div>
           </div>
           <div class="stepper-node active" id="stepAuto">
             <div class="node-dot"></div>
-            <div class="node-label">Anomaly Detection</div>
+            <div class="node-label">Verification</div>
           </div>
           <div class="stepper-node active" id="stepGeo">
             <div class="node-dot"></div>
@@ -224,16 +244,51 @@
       <div class="glass-panel waterfall-panel" id="cardWaterfall">
         <div class="panel-header">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="panel-title"><i class="fa-solid fa-bars-staggered"></i> Side-Scan Sonar Waterfall Scan</span>
+            <span class="panel-title"><i class="fa-solid fa-water"></i> Side-Scan Sonar Waterfall Scan</span>
           </div>
 
           <div style="display: flex; align-items: center; gap: 12px;">
             <div class="view-mode-toggle" id="viewModeContainer">
-              <button class="view-mode-btn" data-mode="raw" id="btnModeRaw">Raw Scan</button>
-              <button class="view-mode-btn" data-mode="enhanced" id="btnModeEnhanced">Enhanced</button>
-              <button class="view-mode-btn active" data-mode="overlay" id="btnModeOverlay">Detections &amp; Masks</button>
+              <button class="view-mode-btn" data-mode="raw" id="btnModeRaw"><i class="fa-solid fa-wave-square"></i> Raw Scan</button>
+              <button class="view-mode-btn" data-mode="enhanced" id="btnModeEnhanced"><i class="fa-solid fa-wand-magic-sparkles"></i> Enhanced</button>
+              <button class="view-mode-btn active" data-mode="overlay" id="btnModeOverlay"><i class="fa-solid fa-layer-group"></i> Detections &amp; Masks</button>
             </div>
-            <span class="panel-tag cyan">DUAL CHANNEL (PORT / STARBOARD)</span>
+            <span class="panel-tag cyan"><i class="fa-solid fa-satellite-dish"></i> DUAL CHANNEL (PORT / STARBOARD)</span>
+          </div>
+        </div>
+
+        <!-- Interactive Layer Visibility Controls Toolbar -->
+        <div class="layer-control-bar" id="layerControlBar">
+          <span class="layer-bar-label"><i class="fa-solid fa-sliders"></i> LAYER CONTROLS:</span>
+          <label class="layer-toggle-btn active" id="lblLayerYolo" title="Toggle YOLO Green Bounding Boxes &amp; Class Badges">
+            <input type="checkbox" id="chkLayerYolo" checked>
+            <i class="fa-solid fa-vector-square layer-icon-yolo"></i>
+            <span>YOLO Boxes</span>
+          </label>
+          <label class="layer-toggle-btn active" id="lblLayerUnet" title="Toggle U-Net Pixel Segmentation Contour &amp; Keypoints">
+            <input type="checkbox" id="chkLayerUnet" checked>
+            <i class="fa-solid fa-draw-polygon layer-icon-unet"></i>
+            <span>U-Net Masks</span>
+          </label>
+          <label class="layer-toggle-btn active" id="lblLayerFusion" title="Toggle Fused Boundary Fill &amp; Multi-Model Overlay">
+            <input type="checkbox" id="chkLayerFusion" checked>
+            <i class="fa-solid fa-cubes-stacked layer-icon-fusion"></i>
+            <span>Fused Boundaries</span>
+          </label>
+          <label class="layer-toggle-btn active" id="lblLayerVerify" title="Toggle Acoustic Verification Badges">
+            <input type="checkbox" id="chkLayerVerify" checked>
+            <i class="fa-solid fa-shield-halved layer-icon-verify"></i>
+            <span>Verification</span>
+          </label>
+          <label class="layer-toggle-btn active" id="lblLayerIds" title="Toggle Target ID Badges &amp; Dual-Model Provenance">
+            <input type="checkbox" id="chkLayerIds" checked>
+            <i class="fa-solid fa-tag layer-icon-ids"></i>
+            <span>Target IDs</span>
+          </label>
+          <div class="layer-bar-actions" style="margin-left: auto; display: flex; gap: 6px;">
+            <button class="layer-quick-btn active" id="btnToggleAllLayers" title="Activate All Overlay Layers">
+              <i class="fa-solid fa-eye"></i> All On
+            </button>
           </div>
         </div>
 
@@ -290,7 +345,7 @@
       <div class="glass-panel inspector-panel">
         <div class="panel-header">
           <span class="panel-title"><i class="fa-solid fa-crosshairs"></i> Target Inspector</span>
-          <span class="panel-tag cyan" id="inspectorTargetCount">MULTI-FACTOR TIER</span>
+          <span class="panel-tag cyan" id="inspectorTargetCount">PARALLEL DUAL-PATH</span>
         </div>
         <div class="panel-subheader">
           <span class="sub-hint"><i class="fa-solid fa-arrow-pointer"></i> Click target to focus &amp; inspect</span>
@@ -342,18 +397,39 @@
   </main>
 
   <!-- =========================================================
+       Ablation Study Comparison Modal
+       ========================================================= -->
+  <div class="modal-backdrop" id="ablationStudyModal" style="display: none;">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <div class="modal-subtitle">SCIENTIFIC ABLATION BENCHMARK</div>
+          <h2 class="modal-title"><i class="fa-solid fa-chart-line" style="color: var(--cyan-beam);"></i> Architectural Performance Comparison</h2>
+        </div>
+        <div class="modal-header-actions">
+          <button class="modal-close" id="btnCloseAblationModal" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="modal-body" id="ablationModalContent">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
        Hydrographic Mission Report Modal
        ========================================================= -->
   <div class="modal-backdrop" id="missionReportModal" style="display: none;">
-    <div class="modal-card">
+    <div class="modal-card modal-xl">
       <div class="modal-header">
         <div class="modal-header-left">
-          <div class="modal-subtitle">AI POWERED UNDERWATER DETECTION SYSTEM</div>
-          <h2 class="modal-title"><i class="fa-solid fa-file-waveform" style="color: var(--cyan-beam);"></i> Hydrographic Survey Mission Report</h2>
+          <div class="modal-subtitle">MINISTRY OF EARTH SCIENCES · NATIONAL INSTITUTE OF OCEAN TECHNOLOGY</div>
+          <h2 class="modal-title"><i class="fa-solid fa-file-waveform" style="color: var(--cyan-beam);"></i> Hydrographic Survey Mission Intelligence Report</h2>
         </div>
         <div class="modal-header-actions">
-          <button class="btn-ghost" id="btnPrintReport"><i class="fa-solid fa-print"></i> Print / PDF</button>
-          <button class="btn-ghost" id="btnDownloadHTML"><i class="fa-solid fa-file-arrow-down"></i> Save HTML</button>
+          <button class="btn-ghost" id="btnPrintReport" title="Print or Save as PDF"><i class="fa-solid fa-print"></i> Print / PDF</button>
+          <button class="btn-ghost" id="btnDownloadHTML" title="Save Full Standalone HTML Dossier"><i class="fa-solid fa-file-arrow-down"></i> Save HTML</button>
+          <button class="btn-ghost" id="btnExportCSVModal" title="Download Debris Inventory CSV"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
           <button class="modal-close" id="btnCloseReportModal" title="Close"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </div>

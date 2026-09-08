@@ -369,6 +369,18 @@ class GISMap {
     }
   }
 
+  selectTarget(targetId, options = {}) {
+    const marker = this.markers[targetId];
+    if (marker) {
+      if (options.fly) {
+        this.map.flyTo(marker.getLatLng(), Math.max(this.map.getZoom(), 16), { duration: 0.8 });
+        setTimeout(() => marker.openPopup(), 300);
+      } else if (!marker.isPopupOpen()) {
+        marker.openPopup();
+      }
+    }
+  }
+
   flyToTarget(targetId) {
     const marker = this.markers[targetId];
     if (marker) {
