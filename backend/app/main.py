@@ -355,7 +355,12 @@ def get_geospatial_targets(limit: int = Query(200, ge=1, le=1000)):
             LIMIT ?
         """, (limit,))
         rows = cursor.fetchall()
-        targets = [dict(r) for r in rows]
+        targets = []
+        for r in rows:
+            d = dict(r)
+            d["latitude"] = d.get("lat")
+            d["longitude"] = d.get("lon")
+            targets.append(d)
     finally:
         conn.close()
 
@@ -367,7 +372,7 @@ def get_geospatial_targets(limit: int = Query(200, ge=1, le=1000)):
                 "type": "Point",
                 "coordinates": [t["lon"], t["lat"]]
             },
-            "properties": {k: v for k, v in t.items() if k not in ("lat", "lon")}
+            "properties": {k: v for k, v in t.items() if k not in ("lat", "lon", "latitude", "longitude")}
         })
 
     return {

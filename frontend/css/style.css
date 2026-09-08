@@ -1057,20 +1057,128 @@ body {
 
 /* GIS Map Panel (When displayed) */
 .map-panel {
-  flex: 1;
-  min-height: 0;
+  min-height: 480px;
+  height: 560px;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-viewport {
   position: relative;
   flex: 1;
-  min-height: 200px;
+  min-height: 380px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  overflow: hidden;
 }
 
 #leafletMap {
   width: 100%;
   height: 100%;
   background: #060b18;
+}
+
+.map-coords-hud {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 1000;
+  background: rgba(3, 11, 24, 0.88);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.map-coords-hud b {
+  color: #38bdf8;
+}
+
+.map-legend-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1000;
+  background: rgba(3, 11, 24, 0.85);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.legend-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-dot.red { background: #ff1744; box-shadow: 0 0 6px #ff1744; }
+.legend-dot.yellow { background: #ffab00; box-shadow: 0 0 6px #ffab00; }
+.legend-dot.green { background: #00e676; box-shadow: 0 0 6px #00e676; }
+
+.legend-line {
+  width: 14px;
+  height: 2px;
+  background: #38bdf8;
+  border-top: 1px dashed #38bdf8;
+}
+
+.panel-btn {
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.panel-btn:hover {
+  background: rgba(14, 165, 233, 0.25);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+}
+
+@keyframes sonar-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
 /* -------------------------------------------------------------

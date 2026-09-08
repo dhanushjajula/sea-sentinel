@@ -257,10 +257,27 @@
             <span class="panel-title"><i class="fa-solid fa-map-location-dot"></i> Georeferenced WGS84 Target Map</span>
             <span class="panel-tag green">EPSG:4326 (WGS84)</span>
           </div>
-          <span class="panel-tag gray" id="mapTargetCount">0 Targets Plotted</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="panel-tag gray" id="mapTargetCount">0 Targets Plotted</span>
+            <button class="panel-btn" id="btnFitMap" title="Focus All Georeferenced Targets">
+              <i class="fa-solid fa-expand"></i> Focus All
+            </button>
+            <button class="panel-btn" id="btnToggleSwath" title="Toggle Sonar Swath & Nadir Trackline">
+              <i class="fa-solid fa-route"></i> Swath
+            </button>
+          </div>
         </div>
         <div class="map-viewport">
           <div id="leafletMap"></div>
+          <div class="map-coords-hud" id="mapCoordsHud">
+            <i class="fa-solid fa-crosshairs"></i> Cursor: <b>42.74740° N, 73.79457° W</b> &nbsp;|&nbsp; Datum: <span style="color:#00f0ff;">WGS84 (EPSG:4326)</span>
+          </div>
+          <div class="map-legend-overlay">
+            <span class="legend-chip"><span class="legend-dot red"></span> High Risk</span>
+            <span class="legend-chip"><span class="legend-dot yellow"></span> Med Risk</span>
+            <span class="legend-chip"><span class="legend-dot green"></span> Low Risk</span>
+            <span class="legend-chip"><span class="legend-line"></span> Nadir Track</span>
+          </div>
         </div>
       </div>
 

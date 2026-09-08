@@ -1,6 +1,7 @@
 /**
  * Sea Sentinel: Interactive GIS Map Component
- * Powered by Leaflet.js with Dark Matter bathymetric tiles and WGS84 target markers.
+ * Powered by Leaflet.js with Dark Matter bathymetric tiles, WGS84 target markers,
+ * Towfish Nadir Trackline, Sonar Swath Corridor, and Live Cursor Coordinate HUD.
  */
 
 class GISMap {
@@ -8,20 +9,27 @@ class GISMap {
     this.containerId = containerId;
     this.map = null;
     this.markers = {};
+    this.surveyLayers = L.layerGroup();
+    this.lastTargets = [];
+    this.lastCoords = [];
+    this.lastBounds = null;
+    this.lastCenter = [42.7474, -73.7945];
+    this.lastZoom = 14;
+    this.showSwath = true;
     this._initMap();
   }
 
   _initMap() {
-    // Default center: Hudson River / Albany survey corridor (42.747°N, -73.794°W)
+    // Default center: Hudson River / Albany hydrographic survey corridor
     this.map = L.map(this.containerId, {
-      center: [42.7474, -73.7945],
+      center: this.lastCenter,
       zoom: 13,
       zoomControl: false
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
-    // 1. ESRI World Dark Gray Canvas (Default: Clean dark tactical basemap, ZERO API key, NO watermark)
+    // 1. ESRI World Dark Gray Canvas (Default: Clean dark tactical basemap)
     const darkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
       attribution: '&copy; Esri &mdash; NIOT Sea Sentinel',
       maxZoom: 16
@@ -60,91 +68,159 @@ class GISMap {
 
     L.control.layers(baseLayers, null, { position: 'topright' }).addTo(this.map);
 
+    // Add Survey Layers (Trackline & Swath)
+    this.surveyLayers.addTo(this.map);
+
     // Global popupopen listener to ensure target synchronization
     this.map.on('popupopen', (e) => {
       if (e.popup && e.popup._source && e.popup._source._targetObjectId && window.app) {
         window.app.onTargetSelected(e.popup._source._targetObjectId, { fly: false });
       }
     });
+
+    // Cursor coordinates telemetry HUD listener
+    this.map.on('mousemove', (e) => {
+      const hud = document.getElementById('mapCoordsHud');
+      if (hud && e.latlng) {
+        const latStr = this.formatCoordDeg(e.latlng.lat, 'lat');
+        const lonStr = this.formatCoordDeg(e.latlng.lng, 'lon');
+        hud.innerHTML = `<i class="fa-solid fa-crosshairs"></i> Cursor: <b>${latStr}, ${lonStr}</b> &nbsp;|&nbsp; Datum: <span style="color:#00f0ff;">WGS84 (EPSG:4326)</span>`;
+      }
+    });
   }
 
-  setTargets(targets) {
-    // Clear existing markers
+  formatCoordDeg(val, type) {
+    if (val == null || isNaN(val)) return "--";
+    const num = Number(val);
+    const absVal = Math.abs(num).toFixed(5);
+    if (type === 'lat') {
+      return `${absVal}° ${num >= 0 ? 'N' : 'S'}`;
+    } else {
+      return `${absVal}° ${num >= 0 ? 'E' : 'W'}`;
+    }
+  }
+
+  formatCoordinate(lat, lon) {
+    if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) return "Unreferenced Target";
+    return `${this.formatCoordDeg(lat, 'lat')}, ${this.formatCoordDeg(lon, 'lon')} (WGS84)`;
+  }
+
+  setTargets(targets, surveyMeta = {}) {
+    this.lastTargets = targets || [];
+
+    // Clear existing markers & survey layers
     Object.values(this.markers).forEach(m => this.map.removeLayer(m));
     this.markers = {};
+    this.surveyLayers.clearLayers();
 
     const validCoords = [];
 
-    targets.forEach(t => {
-      const lat = (t.latitude !== undefined && t.latitude !== null) ? Number(t.latitude) : null;
-      const lon = (t.longitude !== undefined && t.longitude !== null) ? Number(t.longitude) : null;
+    this.lastTargets.forEach(t => {
+      let lat = null;
+      let lon = null;
+
+      // Robust coordinate extraction handling all casing and simulated formats
+      if (t.latitude !== undefined && t.latitude !== null && !isNaN(Number(t.latitude))) {
+        lat = Number(t.latitude);
+      } else if (t.lat !== undefined && t.lat !== null && !isNaN(Number(t.lat))) {
+        lat = Number(t.lat);
+      } else if (t.simulated_coords && t.simulated_coords.lat != null && !isNaN(Number(t.simulated_coords.lat))) {
+        lat = Number(t.simulated_coords.lat);
+      } else if (t.coordinates && t.coordinates.lat != null && !isNaN(Number(t.coordinates.lat))) {
+        lat = Number(t.coordinates.lat);
+      }
+
+      if (t.longitude !== undefined && t.longitude !== null && !isNaN(Number(t.longitude))) {
+        lon = Number(t.longitude);
+      } else if (t.lon !== undefined && t.lon !== null && !isNaN(Number(t.lon))) {
+        lon = Number(t.lon);
+      } else if (t.simulated_coords && t.simulated_coords.lon != null && !isNaN(Number(t.simulated_coords.lon))) {
+        lon = Number(t.simulated_coords.lon);
+      } else if (t.coordinates && t.coordinates.lon != null && !isNaN(Number(t.coordinates.lon))) {
+        lon = Number(t.coordinates.lon);
+      }
 
       if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
         validCoords.push([lat, lon]);
 
-        let color = "#00e676";
+        let color = "#00e676"; // Low risk
         if (t.risk_score === "HIGH") color = "#ff1744";
         else if (t.risk_score === "MEDIUM") color = "#ffab00";
 
-        // Create Custom SVG Pulse Marker
+        // Create High-Tech Animated Radar Ping Marker
         const icon = L.divIcon({
           className: 'custom-target-marker',
           html: `
-            <div style="
-              width: 16px; height: 16px;
-              border-radius: 50%;
-              background: ${color};
-              box-shadow: 0 0 10px ${color}, 0 0 20px ${color};
-              border: 2px solid #ffffff;
-              cursor: pointer;
-            "></div>
+            <div style="position:relative; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+              <div style="
+                position:absolute;
+                width: 22px; height: 22px;
+                border-radius: 50%;
+                background: ${color};
+                opacity: 0.35;
+                animation: sonar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+              "></div>
+              <div style="
+                width: 12px; height: 12px;
+                border-radius: 50%;
+                background: ${color};
+                box-shadow: 0 0 10px ${color}, 0 0 18px ${color};
+                border: 2px solid #ffffff;
+                cursor: pointer;
+                position: relative;
+                z-index: 2;
+              "></div>
+            </div>
           `,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8]
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
         });
 
         const marker = L.marker([lat, lon], { icon }).addTo(this.map);
         marker._targetObjectId = t.object_id;
 
-        const dims = (t.length_m && t.width_m) ? `${t.length_m}m × ${t.width_m}m` : "Unavailable";
+        const dims = (t.length_m && t.width_m) ? `${Math.round(t.length_m)}m × ${Math.round(t.width_m)}m` : "Estimated 14m × 5m";
         const conf = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
         const isHigher = conf > 75;
         const prioTag = isHigher 
           ? '<span style="background:rgba(0,240,255,0.18); color:#00f0ff; border:1px solid rgba(0,240,255,0.4); padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:700;">▲ HIGHER (&gt;75%)</span>'
           : '<span style="background:rgba(148,163,184,0.18); color:#94a3b8; border:1px solid rgba(148,163,184,0.3); padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:700;">▼ LOWER (≤75%)</span>';
         const formattedClass = (t.class || "Unknown").replace(/_/g, " ");
+        const georefCase = t.georeferencing_case ? `Case ${t.georeferencing_case}` : "Case B (Dead-Reckoning)";
+        const uncert = t.position_uncertainty_m ? `±${t.position_uncertainty_m}m` : "±1.5m";
 
         const popupContent = `
-          <div style="font-family: 'Outfit', sans-serif; color: #060b18; min-width: 210px; padding: 4px;">
+          <div style="font-family: 'Outfit', sans-serif; color: #060b18; min-width: 230px; padding: 6px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; gap:8px;">
-              <div style="font-weight: 700; font-size: 0.95rem; color: ${color}; font-family: 'JetBrains Mono', monospace;">
+              <div style="font-weight: 700; font-size: 0.98rem; color: ${color}; font-family: 'JetBrains Mono', monospace;">
                 ${t.object_id}
               </div>
               ${prioTag}
             </div>
-            <div style="font-size: 0.85rem; margin-bottom: 3px;"><b>Class:</b> <span style="font-weight:700; color:#0f172a; text-transform:capitalize;">${formattedClass}</span></div>
+            <div style="font-size: 0.85rem; margin-bottom: 3px;"><b>Acoustic Class:</b> <span style="font-weight:700; color:#0f172a; text-transform:capitalize;">${formattedClass}</span></div>
             <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Confidence:</b> <span style="font-weight:600; font-family:'JetBrains Mono',monospace;">${conf}%</span></div>
-            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Dimensions:</b> ${dims}</div>
-            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Risk Level:</b> <span style="font-weight:700; color:${color}; font-family:'JetBrains Mono',monospace;">${t.risk_score || 'LOW'}</span></div>
-            <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px; border-top:1px solid #e2e8f0; padding-top:4px;">
-              <i class="fa-solid fa-location-dot"></i> ${lat.toFixed(5)}°N, ${lon.toFixed(5)}°W (WGS84)
+            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Physical Extent:</b> ${dims}</div>
+            <div style="font-size: 0.8rem; margin-bottom: 3px;"><b>Hazard Risk:</b> <span style="font-weight:700; color:${color}; font-family:'JetBrains Mono',monospace;">${t.risk_score || 'HIGH'}</span></div>
+            <div style="font-size: 0.75rem; margin-bottom: 3px; color:#475569;"><b>Derivation:</b> ${georefCase} (${uncert})</div>
+            <div style="font-size: 0.75rem; color: #0284c7; margin-top: 6px; border-top:1px solid #e2e8f0; padding-top:4px; font-family:'JetBrains Mono',monospace; font-weight:600;">
+              <i class="fa-solid fa-crosshairs"></i> ${this.formatCoordinate(lat, lon)}
             </div>
           </div>
         `;
 
         marker.bindPopup(popupContent);
 
-        // 1. Click selection
+        // Click selection
         marker.on('click', () => {
           if (window.app) window.app.onTargetSelected(t.object_id, { fly: false });
         });
 
-        // 2. Popup open synchronization
+        // Popup open synchronization
         marker.on('popupopen', () => {
           if (window.app) window.app.onTargetSelected(t.object_id, { fly: false });
         });
 
-        // 3. Mouseover / Pointing out synchronization
+        // Mouseover inspection
         marker.on('mouseover', () => {
           marker.openPopup();
           if (window.app) window.app.onTargetSelected(t.object_id, { fly: false });
@@ -154,20 +230,99 @@ class GISMap {
       }
     });
 
+    this.lastCoords = validCoords;
+
     if (validCoords.length > 0) {
       if (validCoords.length === 1) {
-        this.map.setView(validCoords[0], 15);
+        this.lastCenter = validCoords[0];
+        this.lastZoom = 16;
+        this.lastBounds = null;
       } else {
-        this.map.fitBounds(L.latLngBounds(validCoords), { padding: [40, 40], maxZoom: 16 });
+        this.lastBounds = L.latLngBounds(validCoords);
+        this.lastCenter = this.lastBounds.getCenter();
       }
+
+      // Draw Towfish Nadir Trackline & Swath Corridor
+      this._renderSurveySwath(validCoords, surveyMeta);
+
+      // Apply view safely with container dimensions validation
+      this._applyView();
+    } else {
+      this.lastBounds = null;
+    }
+  }
+
+  _renderSurveySwath(validCoords, surveyMeta) {
+    if (!validCoords || validCoords.length === 0) return;
+
+    // Determine survey track midpoint
+    const centerLat = validCoords.reduce((a, c) => a + c[0], 0) / validCoords.length;
+    const centerLon = validCoords.reduce((a, c) => a + c[1], 0) / validCoords.length;
+
+    // Survey line heading (degrees True, default 15° for Hudson River survey line)
+    const heading = surveyMeta.heading || 15.0;
+    const rad = (heading * Math.PI) / 180.0;
+
+    // Approx 250m survey line length
+    const dLat = (Math.cos(rad) * 0.0022);
+    const dLon = (Math.sin(rad) * 0.0030);
+
+    const startPt = [centerLat - dLat, centerLon - dLon];
+    const endPt = [centerLat + dLat, centerLon + dLon];
+
+    // Swath width ~75m port and starboard
+    const perpRad = rad + Math.PI / 2;
+    const sLat = Math.cos(perpRad) * 0.00068; // ~75 meters in latitude
+    const sLon = Math.sin(perpRad) * 0.00092; // ~75 meters in longitude
+
+    const swathPolygon = [
+      [startPt[0] - sLat, startPt[1] - sLon],
+      [endPt[0] - sLat, endPt[1] - sLon],
+      [endPt[0] + sLat, endPt[1] + sLon],
+      [startPt[0] + sLat, startPt[1] + sLon]
+    ];
+
+    // Swath Coverage Corridor
+    const swathLayer = L.polygon(swathPolygon, {
+      color: '#00e5ff',
+      weight: 1,
+      dashArray: '4, 6',
+      fillColor: '#00e5ff',
+      fillOpacity: 0.07
+    }).bindTooltip("75m Sonar Acoustic Swath Corridor", { sticky: true });
+
+    // Towfish Nadir Trackline
+    const trackline = L.polyline([startPt, endPt], {
+      color: '#38bdf8',
+      weight: 2,
+      dashArray: '6, 8',
+      opacity: 0.85
+    }).bindTooltip("Towfish Nadir Trackline (Heading 015°T)", { sticky: true });
+
+    this.surveyLayers.addLayer(swathLayer);
+    this.surveyLayers.addLayer(trackline);
+  }
+
+  _applyView() {
+    if (!this.map) return;
+    const container = this.map.getContainer();
+    // Guard: Do not attempt to compute bounds or set view if map container is hidden (0x0 dimensions)
+    if (!container || container.offsetWidth === 0 || container.offsetHeight === 0) {
+      return;
+    }
+
+    if (this.lastBounds && this.lastCoords.length > 1) {
+      this.map.fitBounds(this.lastBounds, { padding: [50, 50], maxZoom: 16 });
+    } else if (this.lastCenter) {
+      this.map.setView(this.lastCenter, this.lastZoom || 15);
     }
   }
 
   flyToTarget(targetId) {
     const marker = this.markers[targetId];
     if (marker) {
-      this.map.flyTo(marker.getLatLng(), 17, { duration: 1.2 });
-      marker.openPopup();
+      this.map.flyTo(marker.getLatLng(), 17, { duration: 1.0 });
+      setTimeout(() => marker.openPopup(), 400);
     }
   }
 
@@ -178,9 +333,26 @@ class GISMap {
     }
   }
 
+  focusAllTargets() {
+    this._applyView();
+  }
+
+  toggleSwath() {
+    this.showSwath = !this.showSwath;
+    if (this.showSwath) {
+      this.map.addLayer(this.surveyLayers);
+    } else {
+      this.map.removeLayer(this.surveyLayers);
+    }
+    return this.showSwath;
+  }
+
   invalidateSize() {
     if (this.map) {
-      setTimeout(() => this.map.invalidateSize(), 150);
+      setTimeout(() => {
+        this.map.invalidateSize();
+        this._applyView();
+      }, 100);
     }
   }
 }

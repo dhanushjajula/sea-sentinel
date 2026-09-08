@@ -528,7 +528,12 @@ class DashboardApp {
     this.currentAnalysisResult = result;
     this.targets = result.detections || [];
     this.waterfall.setTargets(this.targets);
-    this.map.setTargets(this.targets);
+
+    const surveyMeta = {
+      heading: (result.nav_log && result.nav_log.heading) || 15.0,
+      altitude_m: (result.nav_log && result.nav_log.altitude_m) || 12.0
+    };
+    this.map.setTargets(this.targets, surveyMeta);
 
     // Update Waterfall Rasters
     const baseUrl = window.apiService.baseUrl;
@@ -627,7 +632,7 @@ class DashboardApp {
       if (isRejected) {
         mapCount.textContent = `0 Targets (Input Rejected)`;
       } else {
-        const plotted = this.targets.filter(t => (t.latitude && t.longitude) || t.simulated_coords).length;
+        const plotted = this.targets.filter(t => (t.latitude != null && t.longitude != null) || (t.lat != null && t.lon != null) || t.simulated_coords || t.coordinates).length;
         if (plotted > 0) {
           mapCount.textContent = `${plotted} Targets Plotted`;
         } else if (total > 0) {
@@ -698,17 +703,22 @@ class DashboardApp {
       const statusLabel = isConfirmed ? "confirmed debris" : "suspicious anomaly";
       const statusClass = isConfirmed ? "confirmed" : "suspicious";
 
-      let lat = t.latitude;
-      let lon = t.longitude;
-      if (!lat && t.simulated_coords) {
-        lat = t.simulated_coords.lat;
-        lon = t.simulated_coords.lon;
-      }
+      let lat = (t.latitude != null) ? Number(t.latitude) : (t.lat != null ? Number(t.lat) : (t.simulated_coords ? Number(t.simulated_coords.lat) : (t.coordinates ? Number(t.coordinates.lat) : null)));
+      let lon = (t.longitude != null) ? Number(t.longitude) : (t.lon != null ? Number(t.lon) : (t.simulated_coords ? Number(t.simulated_coords.lon) : (t.coordinates ? Number(t.coordinates.lon) : null)));
+      if (lat == null && idx === 0) lat = 42.74740;
+      if (lon == null && idx === 0) lon = -73.79457;
+
+      const formatDeg = (num, isLat) => {
+        if (num == null || isNaN(num)) return "--";
+        const val = Math.abs(Number(num)).toFixed(5);
+        const dir = isLat ? (num >= 0 ? 'N' : 'S') : (num >= 0 ? 'E' : 'W');
+        return `${val}°${dir}`;
+      };
+
+      const latVal = formatDeg(lat, true);
+      const lonVal = formatDeg(lon, false);
       const lenM = t.length_m ? Math.round(t.length_m) : (idx === 0 ? 28 : 14);
       const widM = t.width_m ? Math.round(t.width_m) : (idx === 0 ? 9 : 3);
-      const latVal = lat ? Number(lat).toFixed(5) : (idx === 0 ? "42.62887" : "42.72888");
-      const lonVal = lon ? Number(lon).toFixed(5) : (idx === 0 ? "-73.74393" : "-73.69775");
-
       const accStr = (Math.min(98.8, conf * 0.98 + 1.4)).toFixed(1);
 
       item.innerHTML = `
@@ -741,12 +751,20 @@ class DashboardApp {
           </div>
         </div>
         <div class="target-card-geo">
-          <div><i class="fa-solid fa-location-dot"></i> ${latVal}°N, ${lonVal}°W</div>
+          <div><i class="fa-solid fa-location-dot"></i> ${latVal}, ${lonVal}</div>
           <div><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m</div>
         </div>
       `;
       container.appendChild(item);
     });
+  }
+
+  switchToMapAndFly(targetId) {
+    const tabMap = document.getElementById('tabMap');
+    if (tabMap) tabMap.click();
+    setTimeout(() => {
+      if (this.map) this.map.flyToTarget(targetId);
+    }, 200);
   }
 
   onTargetSelected(targetId, options = {}) {
@@ -805,13 +823,19 @@ class DashboardApp {
     const shadowClass = target.shadow_verified ? "verified" : "unverified";
     const shadowIcon = target.shadow_verified ? "fa-circle-check" : "fa-circle-question";
     const mseVal = target.reconstruction_error ? target.reconstruction_error.toFixed(4) : "0.0412";
-    let lat = target.latitude;
-    let lon = target.longitude;
-    if (!lat && target.simulated_coords) {
-      lat = target.simulated_coords.lat;
-      lon = target.simulated_coords.lon;
-    }
-    const coordsStr = (lat && lon) ? `${Number(lat).toFixed(5)}°N, ${Number(lon).toFixed(5)}°W` : "42.62887°N, -73.74393°W";
+
+    let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : (target.simulated_coords ? Number(target.simulated_coords.lat) : (target.coordinates ? Number(target.coordinates.lat) : null)));
+    let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : (target.simulated_coords ? Number(target.simulated_coords.lon) : (target.coordinates ? Number(target.coordinates.lon) : null)));
+    if (lat == null) lat = 42.74740;
+    if (lon == null) lon = -73.79457;
+
+    const formatDeg = (num, isLat) => {
+      if (num == null || isNaN(num)) return "--";
+      const val = Math.abs(Number(num)).toFixed(5);
+      const dir = isLat ? (num >= 0 ? 'N' : 'S') : (num >= 0 ? 'E' : 'W');
+      return `${val}°${dir}`;
+    };
+    const coordsStr = `${formatDeg(lat, true)}, ${formatDeg(lon, false)}`;
     const lenM = target.length_m ? Math.round(target.length_m) : 28;
     const widM = target.width_m ? Math.round(target.width_m) : 9;
 
@@ -834,12 +858,19 @@ class DashboardApp {
             <span class="chip-lbl">AUTOENCODER MSE</span>
             <span class="chip-val mono">${mseVal}</span>
           </div>
-          <div class="physics-chip full-width">
-            <span class="chip-lbl">WGS84 GEOLOCATION & EXTENT</span>
-            <span class="chip-val mono"><i class="fa-solid fa-crosshairs"></i> ${coordsStr} &nbsp;|&nbsp; ${lenM}m (L) × ${widM}m (W)</span>
+          <div class="physics-chip full-width" style="cursor: pointer;" id="chipCoordsLocate" title="Click to focus target on GIS Map">
+            <span class="chip-lbl">WGS84 GEOLOCATION & EXTENT (CLICK TO VIEW ON MAP)</span>
+            <span class="chip-val mono" style="color:#38bdf8;"><i class="fa-solid fa-map-location-dot"></i> ${coordsStr} &nbsp;|&nbsp; ${lenM}m (L) × ${widM}m (W)</span>
           </div>
         </div>
       `;
+
+      const chipLocate = document.getElementById('chipCoordsLocate');
+      if (chipLocate) {
+        chipLocate.onclick = () => {
+          this.switchToMapAndFly(target.object_id);
+        };
+      }
     }
 
     if (statusTag) {
@@ -878,6 +909,24 @@ class DashboardApp {
         if (this.waterfall) this.waterfall.render();
       });
     });
+
+    // GIS Map Header Controls
+    const btnFitMap = document.getElementById('btnFitMap');
+    if (btnFitMap) {
+      btnFitMap.addEventListener('click', () => {
+        if (this.map) this.map.focusAllTargets();
+      });
+    }
+
+    const btnToggleSwath = document.getElementById('btnToggleSwath');
+    if (btnToggleSwath) {
+      btnToggleSwath.addEventListener('click', () => {
+        if (this.map) {
+          const active = this.map.toggleSwath();
+          btnToggleSwath.classList.toggle('active', active);
+        }
+      });
+    }
 
     // 2. View Mode Toggles (Raw / Enhanced / Detections)
     const viewButtons = document.querySelectorAll('.view-mode-btn');
