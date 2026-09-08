@@ -59,16 +59,19 @@ UPLOADS_DIR = os.path.join(PROJECT_ROOT, "outputs", "uploads")
 PREPROCESSED_DIR = os.path.join(PROJECT_ROOT, "outputs", "preprocessed")
 REPORTS_DIR = os.path.join(PROJECT_ROOT, "outputs", "reports")
 SAMPLES_DIR = os.path.join(PROJECT_ROOT, "datasets", "samples")
+FEEDBACK_CROPS_DIR = os.path.join(PROJECT_ROOT, "outputs", "feedback", "crops")
 TEST_SAMPLES_DIR = os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "test")
 
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(PREPROCESSED_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
 os.makedirs(SAMPLES_DIR, exist_ok=True)
+os.makedirs(FEEDBACK_CROPS_DIR, exist_ok=True)
 
 # Mount Static File Routes
 app.mount("/static/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 app.mount("/static/preprocessed", StaticFiles(directory=PREPROCESSED_DIR), name="preprocessed")
+app.mount("/static/feedback/crops", StaticFiles(directory=FEEDBACK_CROPS_DIR), name="feedback_crops")
 if os.path.exists(SAMPLES_DIR):
     app.mount("/static/samples", StaticFiles(directory=SAMPLES_DIR), name="samples")
 
@@ -80,6 +83,20 @@ class AnalyzeRequest(BaseModel):
     image_path: str
     raster_meta: Optional[Dict[str, Any]] = None
     nav_log: Optional[Dict[str, Any]] = None
+
+
+class FeedbackRequest(BaseModel):
+    analysis_id: str
+    object_id: str
+    comment: str
+    corrected_class_override: Optional[str] = None
+
+
+class TrainRequest(BaseModel):
+    epochs: int = 5
+    batch_size: int = 8
+    device: str = "cpu"
+    dry_run: bool = False
 
 
 # -----------------------------------------------------------------
@@ -445,6 +462,182 @@ def download_survey_csv(analysis_id: str):
         media_type="text/csv",
         filename=f"{analysis_id}_hydrographic_report.csv"
     )
+
+
+# -----------------------------------------------------------------
+# Human Feedback & Continuous Learning Endpoints
+# -----------------------------------------------------------------
+@app.post("/api/feedback")
+def submit_feedback(req: FeedbackRequest):
+    """
+    Submits natural language human feedback for a YOLO11 detection:
+      1. Parses natural language comment using FeedbackNLUEngine.
+      2. Extracts crop and stores acoustic signature in SQLite CorrectionMemory.
+      3. Automatically writes normalized training sample to YOLOv11 dataset directory.
+      4. Hot-updates cached target in memory for instant UI reflection.
+    """
+    if not req.comment or not req.comment.strip():
+        raise HTTPException(status_code=400, detail="Comment cannot be empty.")
+
+    # Locate survey data
+    analysis = CACHED_ANALYSES.get(req.analysis_id)
+    if not analysis:
+        if req.analysis_id == "latest" and CACHED_ANALYSES:
+            analysis = CACHED_ANALYSES.get("latest")
+        else:
+            summary = agent.audit_logger.get_session_summary(req.analysis_id)
+            if not summary:
+                raise HTTPException(status_code=404, detail=f"Survey session '{req.analysis_id}' not found.")
+            analysis = summary
+
+    # Locate target
+    targets = analysis.get("detections") or analysis.get("targets") or []
+    target = next((t for t in targets if str(t.get("object_id")) == str(req.object_id)), None)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"Target '{req.object_id}' not found in survey '{req.analysis_id}'.")
+
+    # Run NLU parser
+    orig_class = target.get("class", "unknown")
+    nlu_result = agent.nlu_engine.parse_feedback(
+        text=req.comment,
+        original_class=orig_class
+    )
+    if req.corrected_class_override and req.corrected_class_override in agent.nlu_engine.CLASS_NAME_TO_ID:
+        nlu_result["corrected_class"] = req.corrected_class_override
+        nlu_result["corrected_class_id"] = agent.nlu_engine.CLASS_NAME_TO_ID[req.corrected_class_override]
+
+    # Resolve image source & full image
+    img_path = analysis.get("image_path") or analysis.get("raw_image_path")
+    if not img_path or not os.path.exists(img_path):
+        candidate_raw = os.path.join(PREPROCESSED_DIR, f"{analysis.get('analysis_id', req.analysis_id)}_raw.png")
+        if os.path.exists(candidate_raw):
+            img_path = candidate_raw
+
+    full_img = None
+    bbox = target.get("bbox", {})
+    if img_path and os.path.exists(img_path):
+        try:
+            full_img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+        except Exception:
+            full_img = None
+
+    if full_img is None:
+        full_img = np.zeros((256, 256), dtype=np.uint8)
+        bbox = {"x1": 32, "y1": 32, "x2": 96, "y2": 96}
+
+    # Save to Correction Memory
+    mem_entry = agent.correction_memory.save_correction(
+        source_image=full_img if img_path is None else img_path,
+        bbox=bbox,
+        original_class=orig_class,
+        corrected_class=nlu_result["corrected_class"],
+        corrected_class_id=nlu_result["corrected_class_id"],
+        human_comment=req.comment,
+        extracted_reason=nlu_result.get("rationale", "User feedback"),
+        correction_type=nlu_result.get("correction_type", "reclassify"),
+        original_confidence=float(target.get("calibrated_confidence") or target.get("confidence") or 0.5),
+        session_id=analysis.get("analysis_id", req.analysis_id),
+        object_id=req.object_id
+    )
+
+    # Accumulate into YOLO dataset if valid class (not false_alarm)
+    dataset_entry = None
+    if nlu_result.get("corrected_class") != "false_alarm" and nlu_result.get("corrected_class_id") is not None and nlu_result.get("corrected_class_id") >= 0:
+        try:
+            dataset_entry = agent.dataset_accumulator.add_correction_sample(
+                feedback_id=mem_entry["feedback_id"],
+                image_input=full_img if img_path is None else img_path,
+                bbox=bbox,
+                class_id=nlu_result["corrected_class_id"]
+            )
+        except Exception as e:
+            print(f"[Feedback API] Dataset accumulation error: {e}")
+
+    # Hot-update target in-place
+    target["original_model_class"] = orig_class
+    target["class"] = nlu_result["corrected_class"]
+    target["class_id"] = nlu_result["corrected_class_id"]
+    target["memory_corrected"] = True
+    target["human_feedback"] = {
+        "feedback_id": mem_entry["feedback_id"],
+        "comment": req.comment,
+        "rationale": nlu_result.get("rationale"),
+        "confidence": nlu_result.get("confidence"),
+        "crop_url": mem_entry.get("crop_url")
+    }
+
+    if "explanation" in target and isinstance(target["explanation"], dict):
+        target["explanation"]["executive_narrative"] = (
+            f"Human Correction Applied: Reclassified from '{orig_class}' to '{nlu_result['corrected_class']}' "
+            f"via operator feedback (Reason: {nlu_result.get('rationale', 'User specified correction')})."
+        )
+
+    if "stats" in analysis:
+        analysis["stats"]["memory_corrected_count"] = sum(1 for d in targets if d.get("memory_corrected"))
+
+    return {
+        "status": "success",
+        "message": f"Feedback applied: '{orig_class}' -> '{nlu_result['corrected_class']}'",
+        "feedback_id": mem_entry["feedback_id"],
+        "crop_url": mem_entry.get("crop_url"),
+        "original_class": orig_class,
+        "corrected_class": nlu_result["corrected_class"],
+        "corrected_class_id": nlu_result["corrected_class_id"],
+        "rationale": nlu_result.get("rationale"),
+        "nlu_confidence": nlu_result.get("confidence"),
+        "dataset_sample_added": dataset_entry is not None,
+        "target": target
+    }
+
+
+@app.get("/api/feedback/memory")
+def get_feedback_memory(limit: int = Query(50, ge=1, le=500)):
+    """Retrieves list of accumulated human corrections and memory statistics."""
+    corrections = agent.correction_memory.get_recent_corrections(limit=limit)
+    mem_stats = agent.correction_memory.get_stats()
+    ds_stats = agent.dataset_accumulator.get_dataset_stats()
+    train_status = agent.learner.get_status()
+    return {
+        "status": "success",
+        "stats": {
+            **mem_stats,
+            **ds_stats,
+            "training_status": train_status
+        },
+        "corrections": corrections
+    }
+
+
+@app.post("/api/feedback/train")
+def trigger_fine_tuning(req: Optional[TrainRequest] = None):
+    """Triggers periodic YOLO11 transfer learning fine-tuning on accumulated human corrections."""
+    epochs = req.epochs if req else 5
+    batch = req.batch_size if req else 8
+    dev = req.device if req else "cpu"
+    dry = req.dry_run if req else False
+
+    ds_stats = agent.dataset_accumulator.get_dataset_stats()
+    if not ds_stats.get("ready_for_fine_tuning") and not dry:
+        return {
+            "status": "insufficient_data",
+            "message": "No accumulated feedback samples yet. Submit at least one correction or set dry_run=True.",
+            "dataset_stats": ds_stats
+        }
+
+    res = agent.learner.start_background_training(
+        data_yaml=agent.dataset_accumulator.data_yaml_path,
+        epochs=epochs,
+        batch_size=batch,
+        device=dev,
+        dry_run=dry
+    )
+    return res
+
+
+@app.get("/api/feedback/status")
+def get_learner_status():
+    """Checks continuous training and model hot-reload status."""
+    return agent.learner.get_status()
 
 
 @app.get("/api/report/{analysis_id}")

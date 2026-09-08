@@ -53,8 +53,8 @@ def test_api_upload_and_analyze():
     """Verify file upload followed by end-to-end analysis."""
     with tempfile.TemporaryDirectory() as tmpdir:
         test_img_path = os.path.join(tmpdir, "sonar_upload_test.png")
-        # Generate test sonar chip
-        img = np.ones((256, 256), dtype=np.uint8) * 120
+        # Generate test sonar chip with acoustic speckle
+        img = np.random.rayleigh(scale=35.0, size=(256, 256)).clip(0, 255).astype(np.uint8)
         img[60:100, 60:90] = 230   # Highlight
         img[60:100, 95:130] = 15   # Shadow
         cv2.imwrite(test_img_path, img)

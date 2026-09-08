@@ -2096,3 +2096,70 @@ body {
     transform: translate(-50%, 0);
   }
 }
+
+/* =========================================================
+   Human Feedback & Correction Memory Styles
+   ========================================================= */
+.btn-target-feedback {
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  color: var(--cyan-beam);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.btn-target-feedback:hover {
+  background: rgba(0, 240, 255, 0.22);
+  border-color: var(--cyan-beam);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.chip-memory-corrected {
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: var(--cyan-beam);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.feedback-modal-card {
+  max-width: 520px;
+  border: 1px solid var(--border-cyan);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+.feedback-target-summary .summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.feedback-target-summary .summary-lbl {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.feedback-target-summary .summary-val {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-bright);
+}

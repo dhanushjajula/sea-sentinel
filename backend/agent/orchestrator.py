@@ -31,6 +31,10 @@ from ai.measurement.estimator import DimensionEstimator
 from ai.geospatial.geotagger import GeospatialEngine
 from agent.explainability import ExplainabilitySynthesizer
 from agent.audit_logger import SurveyAuditLogger
+from ai.feedback.correction_memory import CorrectionMemory
+from ai.feedback.nlu_engine import FeedbackNLUEngine
+from ai.feedback.dataset_accumulator import FeedbackDatasetAccumulator
+from ai.feedback.learner import YOLOLearner
 
 
 class SIHPipelineAgent:
@@ -59,6 +63,20 @@ class SIHPipelineAgent:
         self.geotagger = GeospatialEngine()
         self.explainer = ExplainabilitySynthesizer()
         self.audit_logger = SurveyAuditLogger()
+
+        # Continuous Learning & Human Feedback Engines
+        self.correction_memory = CorrectionMemory()
+        self.nlu_engine = FeedbackNLUEngine()
+        self.dataset_accumulator = FeedbackDatasetAccumulator()
+        self.learner = YOLOLearner(
+            on_model_deployed=self.hot_reload_yolo_model
+        )
+
+    def hot_reload_yolo_model(self, new_checkpoint_path: str):
+        """Hot-reloads the YOLO detector with newly fine-tuned weights without restarting the server."""
+        if os.path.exists(new_checkpoint_path):
+            self.detector.model_path = new_checkpoint_path
+            self.detector._load_model()
 
     def analyze_image(
         self,
@@ -299,6 +317,20 @@ class SIHPipelineAgent:
             y2 = max(y1 + 1, min(h_raw, int(bbox.get("y2", h_raw))))
             patch_crop = raw_img[y1:y2, x1:x2]
 
+            # 6-mem: Correction Memory Lookup ("Similar previous mistake?")
+            mem_match = self.correction_memory.find_similar_mistake(
+                candidate_crop=patch_crop,
+                candidate_class=det.get("class", "unknown"),
+                similarity_threshold=0.78
+            )
+            is_memory_corrected = mem_match.get("matched", False)
+            if is_memory_corrected:
+                det["original_model_class"] = det.get("class")
+                det["class"] = mem_match["corrected_class"]
+                det["class_id"] = mem_match["corrected_class_id"]
+                det["memory_corrected"] = True
+                det["memory_match_details"] = mem_match
+
             # 6a: U-Net Region Segmentation
             t_u0 = time.perf_counter()
             seg_res = self.segmenter.segment_roi(patch_crop)
@@ -398,8 +430,17 @@ class SIHPipelineAgent:
                 raster_meta.get("crs") or "WGS84 (EPSG:4326)"
             ) if has_valid_coords else "UNREFERENCED"
             rec["georeferencing_case"] = effective_case
-            rec["position_uncertainty_m"] = uncertainty_m if has_valid_coords else None
             rec["dataset_profile"] = raster_meta.get("dataset_profile")
+            rec["memory_corrected"] = is_memory_corrected
+            if is_memory_corrected:
+                rec["original_model_class"] = mem_match.get("original_class")
+                rec["memory_match_details"] = mem_match
+                if explanation and "executive_narrative" in explanation:
+                    explanation["executive_narrative"] += (
+                        f" [Correction Memory: Reclassified from '{mem_match['original_class']}' "
+                        f"to '{mem_match['corrected_class']}' based on human feedback "
+                        f"({int(mem_match['similarity']*100)}% acoustic match)]."
+                    )
 
             # Normalized bounding box for responsive client-side scaling
             w_img = max(1, w_raw)
@@ -508,7 +549,8 @@ class SIHPipelineAgent:
             "confirmed_debris": sum(1 for d in final_objects if d.get("anomaly_status") == "confirmed_debris"),
             "suspicious_anomaly": sum(1 for d in final_objects if d.get("anomaly_status") == "suspicious_anomaly"),
             "noise_rejected": sum(1 for d in final_objects if d.get("anomaly_status") == "noise_rejected"),
-            "high_risk_count": sum(1 for d in final_objects if d.get("risk_score") == "HIGH")
+            "high_risk_count": sum(1 for d in final_objects if d.get("risk_score") == "HIGH"),
+            "memory_corrected_count": sum(1 for d in final_objects if d.get("memory_corrected"))
         }
 
         # -------------------------------------------------------------

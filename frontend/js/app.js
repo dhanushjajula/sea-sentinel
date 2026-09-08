@@ -753,6 +753,8 @@ class DashboardApp {
         <div class="target-card-tags">
           <span class="chip-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
           <span class="priority-badge ${isHigher ? 'higher' : 'lower'}">${isHigher ? '▲ HIGHER' : '▼ LOWER'}</span>
+          ${t.memory_corrected ? `<span class="chip-memory-corrected" title="Auto-corrected from ${t.original_model_class || 'previous'}" style="margin-left: 2px;"><i class="fa-solid fa-lightbulb"></i> Corrected</span>` : ''}
+          <button type="button" class="btn-target-feedback" data-obj-id="${t.object_id}" title="Provide human feedback / correct detection" style="margin-left: auto;"><i class="fa-solid fa-comment-dots"></i> Feedback</button>
         </div>
         <div class="target-card-metrics">
           <div class="metric-item">
@@ -773,6 +775,15 @@ class DashboardApp {
           <div><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m</div>
         </div>
       `;
+
+      const fbBtn = item.querySelector('.btn-target-feedback');
+      if (fbBtn) {
+        fbBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.openFeedbackModal(t.object_id);
+        };
+      }
+
       container.appendChild(item);
     });
   }
@@ -1098,6 +1109,28 @@ class DashboardApp {
     if (btnSaveHTML) {
       btnSaveHTML.addEventListener('click', () => this.downloadReportHTML());
     }
+
+    // 7. Human Feedback Modal
+    const btnCloseFeedback = document.getElementById('btnCloseFeedbackModal');
+    const btnCancelFeedback = document.getElementById('btnCancelFeedback');
+    const btnSubmitFeedback = document.getElementById('btnSubmitFeedback');
+    const feedbackModal = document.getElementById('feedbackModal');
+
+    const closeFeedback = () => {
+      if (feedbackModal) feedbackModal.style.display = 'none';
+    };
+
+    if (btnCloseFeedback) btnCloseFeedback.addEventListener('click', closeFeedback);
+    if (btnCancelFeedback) btnCancelFeedback.addEventListener('click', closeFeedback);
+    if (feedbackModal) {
+      feedbackModal.addEventListener('click', (e) => {
+        if (e.target === feedbackModal) closeFeedback();
+      });
+    }
+
+    if (btnSubmitFeedback) {
+      btnSubmitFeedback.addEventListener('click', () => this.submitCurrentFeedback());
+    }
   }
 
   async handleFileSelection(file) {
@@ -1334,6 +1367,128 @@ class DashboardApp {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  openFeedbackModal(objectId) {
+    const target = this.targets.find(t => String(t.object_id) === String(objectId));
+    if (!target) return;
+
+    this.feedbackTarget = target;
+    const modal = document.getElementById('feedbackModal');
+    const summary = document.getElementById('feedbackTargetSummary');
+    const commentInput = document.getElementById('feedbackCommentInput');
+    const statusMsg = document.getElementById('feedbackStatusMsg');
+
+    if (!modal) return;
+
+    const conf = Math.round((target.calibrated_confidence || target.confidence || 0.8) * 100);
+    const cleanCls = (target.class || 'unknown').replace(/_/g, ' ');
+
+    if (summary) {
+      summary.innerHTML = `
+        <div class="summary-row"><span class="summary-lbl">Target:</span> <span class="summary-val">${target.object_id}</span></div>
+        <div class="summary-row"><span class="summary-lbl">YOLO Detection:</span> <span class="summary-val" style="color: var(--cyan-beam); text-transform: capitalize;">${cleanCls} (${conf}% Conf)</span></div>
+        ${target.memory_corrected ? `<div class="summary-row"><span class="summary-lbl">Memory Status:</span> <span class="summary-val" style="color: #38bdf8;">Corrected from '${target.original_model_class || ''}'</span></div>` : ''}
+      `;
+    }
+
+    if (commentInput) {
+      commentInput.value = '';
+    }
+    if (statusMsg) {
+      statusMsg.style.display = 'none';
+      statusMsg.textContent = '';
+      statusMsg.className = '';
+    }
+
+    modal.style.display = 'flex';
+    if (commentInput) commentInput.focus();
+  }
+
+  async submitCurrentFeedback() {
+    if (!this.feedbackTarget) return;
+
+    const commentInput = document.getElementById('feedbackCommentInput');
+    const statusMsg = document.getElementById('feedbackStatusMsg');
+    const submitBtn = document.getElementById('btnSubmitFeedback');
+
+    const comment = commentInput ? commentInput.value.trim() : '';
+    if (!comment) {
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusMsg.style.color = '#ef4444';
+        statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusMsg.textContent = 'Please enter a natural language comment explaining the correction.';
+      }
+      return;
+    }
+
+    const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+    }
+
+    try {
+      const analysisId = (this.currentAnalysisResult && this.currentAnalysisResult.analysis_id) || "latest";
+      const res = await window.apiService.submitFeedback(
+        analysisId,
+        this.feedbackTarget.object_id,
+        comment
+      );
+
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusMsg.style.color = '#10b981';
+        statusMsg.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusMsg.innerHTML = `<i class="fa-solid fa-circle-check"></i> <b>Learned:</b> Reclassified as <b>${res.corrected_class.replace(/_/g, ' ')}</b>. Saved to memory.`;
+      }
+
+      // Update local target record
+      this.feedbackTarget.original_model_class = res.original_class;
+      this.feedbackTarget.class = res.corrected_class;
+      this.feedbackTarget.class_id = res.corrected_class_id;
+      this.feedbackTarget.memory_corrected = true;
+      if (res.target && res.target.priority_level) {
+        this.feedbackTarget.priority_level = res.target.priority_level;
+        this.feedbackTarget.priority_label = res.target.priority_label;
+      }
+
+      // Re-render target cards to reflect new class and memory badge
+      this.renderTargetList();
+      this.onTargetSelected(this.feedbackTarget.object_id, { fly: false, force: true });
+
+      this.showToast({
+        type: "success",
+        title: "Correction Stored in Memory",
+        message: `YOLO learned '${res.original_class}' → '${res.corrected_class}'. Future similar detections will be corrected automatically.`
+      });
+
+      setTimeout(() => {
+        const modal = document.getElementById('feedbackModal');
+        if (modal) modal.style.display = 'none';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origBtnText;
+        }
+      }, 1200);
+
+    } catch (err) {
+      console.error("Feedback submission error:", err);
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusMsg.style.color = '#ef4444';
+        statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusMsg.textContent = err.message || 'Failed to submit feedback.';
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origBtnText;
+      }
+    }
   }
 }
 

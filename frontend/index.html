@@ -359,6 +359,48 @@
     </div>
   </div>
 
+  <!-- =========================================================
+       Target Human Feedback & Correction Modal
+       ========================================================= -->
+  <div class="modal-backdrop" id="feedbackModal" style="display: none;">
+    <div class="modal-card feedback-modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <div class="modal-subtitle">CONTINUOUS LEARNING &amp; CORRECTION MEMORY</div>
+          <h2 class="modal-title" style="font-size: 1.15rem;"><i class="fa-solid fa-comment-dots" style="color: var(--cyan-beam);"></i> Provide Feedback for Target</h2>
+        </div>
+        <div class="modal-header-actions">
+          <button class="modal-close" id="btnCloseFeedbackModal" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 20px;">
+        <div class="feedback-target-summary" id="feedbackTargetSummary" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-dark, #334155); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.85rem;">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div>
+          <label for="feedbackCommentInput" style="display: block; font-size: 0.82rem; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">
+            Explain what this target actually is (Natural Language):
+          </label>
+          <textarea id="feedbackCommentInput" rows="3" placeholder="e.g. 'This is actually a fishing net snagged on rocks, not a pipeline' or 'False alarm caused by seabed ridge'..." style="width: 100%; border-radius: 8px; border: 1px solid var(--border-dark, #334155); background: #0b1120; color: #f8fafc; padding: 12px; font-family: inherit; font-size: 0.88rem; resize: vertical; box-sizing: border-box; line-height: 1.4; outline: none;"></textarea>
+          <div style="font-size: 0.74rem; color: #64748b; margin-top: 5px;">
+            AI understands natural language explanations and updates Correction Memory to avoid repeating similar mistakes.
+          </div>
+        </div>
+
+        <div id="feedbackStatusMsg" style="margin-top: 12px; display: none; padding: 10px 14px; border-radius: 6px; font-size: 0.84rem;"></div>
+
+        <div style="margin-top: 18px; display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn-ghost" id="btnCancelFeedback" style="padding: 8px 16px; font-size: 0.85rem;">Cancel</button>
+          <button type="button" class="btn-primary" id="btnSubmitFeedback" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 600;">
+            <i class="fa-solid fa-paper-plane"></i> Submit Feedback
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Leaflet GIS JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
