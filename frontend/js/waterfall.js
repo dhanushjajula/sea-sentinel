@@ -68,6 +68,10 @@ class WaterfallViewer {
     this.render();
   }
 
+  highlightTarget(targetId) {
+    this.selectTarget(targetId);
+  }
+
   setViewMode(mode) {
     this.currentMode = mode;
     this.render();

@@ -520,7 +520,7 @@ class DashboardApp {
         this.handlePipelineRejection(err.detail || err.message);
       } else {
         if (statusPill && statusText) {
-          statusPill.className = "status-pill processing";
+          statusPill.className = "status-pill error";
           statusText.textContent = "PIPELINE ERROR";
         }
         this.showToast({
@@ -600,7 +600,11 @@ class DashboardApp {
     this.renderTargetList();
 
     if (this.targets.length > 0) {
-      this.onTargetSelected(this.targets[0].object_id, { fly: false, force: true });
+      try {
+        this.onTargetSelected(this.targets[0].object_id, { fly: false, force: true });
+      } catch (selErr) {
+        console.warn("Initial target selection warning:", selErr);
+      }
     } else {
       this._clearInspector();
       const narrativeEl = document.getElementById('targetNarrative');
@@ -792,8 +796,25 @@ class DashboardApp {
     });
 
     // Notify Waterfall Overlay & Map
-    if (this.waterfall) this.waterfall.highlightTarget(targetId);
-    if (this.map && options.fly !== false) this.map.highlightTarget(targetId);
+    try {
+      if (this.waterfall) {
+        if (typeof this.waterfall.highlightTarget === 'function') {
+          this.waterfall.highlightTarget(targetId);
+        } else if (typeof this.waterfall.selectTarget === 'function') {
+          this.waterfall.selectTarget(targetId);
+        }
+      }
+    } catch (wfErr) {
+      console.warn("Waterfall target highlight warning:", wfErr);
+    }
+
+    try {
+      if (this.map && options.fly !== false && typeof this.map.highlightTarget === 'function') {
+        this.map.highlightTarget(targetId);
+      }
+    } catch (mapErr) {
+      console.warn("Map target highlight warning:", mapErr);
+    }
 
     // Update Bottom Inspector Drawer
     const target = this.targets.find(t => t.object_id === targetId);

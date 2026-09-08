@@ -318,7 +318,8 @@ body {
   border: 1px solid rgba(0, 229, 255, 0.4);
 }
 
-.status-pill.rejected {
+.status-pill.rejected,
+.status-pill.error {
   color: var(--coral-danger);
   background: rgba(255, 51, 102, 0.15);
   border: 1px solid rgba(255, 51, 102, 0.55);
@@ -334,7 +335,8 @@ body {
   animation: pulse-glow 1.5s infinite;
 }
 
-.status-pill.rejected .status-dot {
+.status-pill.rejected .status-dot,
+.status-pill.error .status-dot {
   background: var(--coral-danger);
   box-shadow: 0 0 10px var(--coral-danger);
   animation: none;
