@@ -408,7 +408,8 @@ class WaterfallViewer {
         // (B) Magenta Label Pill Badge (matching reference image "Normal" / Class tag)
         const confPct = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
         const cleanClass = (t.class || "debris").replace(/_/g, " ").toUpperCase();
-        const badgeText = `${cleanClass} ${confPct}%`;
+        const provBadge = srcCategory === "BOTH" ? " [YOLO+U-NET]" : (srcCategory === "UNET_ONLY" ? " [U-NET]" : " [YOLO]");
+        const badgeText = `${cleanClass} ${confPct}%${provBadge}`;
 
         ctx.font = "bold 11px 'JetBrains Mono', monospace";
         const tagW = ctx.measureText(badgeText).width + 16;

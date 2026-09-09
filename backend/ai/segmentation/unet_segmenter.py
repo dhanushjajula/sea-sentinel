@@ -298,6 +298,31 @@ class UNetSegmenter:
             max_area_ratio=self.max_component_area_ratio
         )
 
+        # Resilient acoustic backscatter segmentation: If neural mask is saturated (e.g. flat uncalibrated output)
+        # or yielded zero valid objects, segment high acoustic backscatter target reliefs
+        mask_coverage = float(np.sum(cleaned_mask)) / float(max(1, h * w))
+        if len(objects) == 0 or mask_coverage > 0.35:
+            blur = cv2.GaussianBlur(gray, (5, 5), 0)
+            m_val = float(np.mean(blur))
+            s_val = float(np.std(blur))
+            t_val = max(80.0, m_val + 0.65 * s_val)
+            _, acoustic_mask = cv2.threshold(blur, int(t_val), 255, cv2.THRESH_BINARY)
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            acoustic_mask = cv2.morphologyEx(acoustic_mask, cv2.MORPH_OPEN, kernel)
+            acoustic_mask = cv2.morphologyEx(acoustic_mask, cv2.MORPH_CLOSE, kernel)
+
+            acoustic_objects = self.extract_candidate_objects(
+                binary_mask=acoustic_mask,
+                probability_map=full_prob,
+                min_area=max(20, min_comp_area),
+                max_area_ratio=self.max_component_area_ratio
+            )
+            if acoustic_objects:
+                acoustic_objects.sort(key=lambda o: o.get("mask_area", 0), reverse=True)
+                objects = acoustic_objects[:10]
+                cleaned_mask = acoustic_mask
+
         inference_time_ms = round((time.perf_counter() - t0) * 1000, 2)
 
         return {

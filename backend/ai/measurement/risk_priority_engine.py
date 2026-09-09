@@ -273,11 +273,21 @@ class RiskPriorityEngine:
         w_x = self.priority_weights.get("object_extent", 0.15)
         w_l = self.priority_weights.get("location_sensitivity", 0.15)
 
+        # Dual-Model Consensus Bonus: Targets confirmed by BOTH YOLOv11 and Attention U-Net
+        # possess highest acoustic verification credibility and urgent inspection priority.
+        is_both = (
+            target.get("source_category") == "BOTH" or
+            len(target.get("sources", [])) > 1 or
+            target.get("agreement", False)
+        )
+        dual_bonus = 12.0 if is_both else 0.0
+
         raw_priority = (
             hazard_risk * w_h +
             conf_pct * w_e +
             extent_score * w_x +
-            loc_score * w_l
+            loc_score * w_l +
+            dual_bonus
         ) * reliability_mod
 
         priority_score = int(round(min(100.0, max(5.0, raw_priority))))
@@ -303,7 +313,14 @@ class RiskPriorityEngine:
         else:
             reasons.append(f"{clean_name} debris signature identified")
 
-        # B. AI Detection Evidence
+        # B. AI Detection Evidence & Provenance
+        if is_both:
+            reasons.append("Parallel Dual-Path Consensus: Confirmed simultaneously by both YOLOv11 (bounding box) and Attention U-Net (pixel contour)")
+        elif target.get("source_category") == "UNET_ONLY":
+            reasons.append("Discovered exclusively by Attention U-Net semantic segmenter (recovered YOLO miss)")
+        elif target.get("source_category") == "YOLO_ONLY":
+            reasons.append("Discovered exclusively by YOLOv11 high-speed object detector")
+
         if conf_pct >= 90:
             reasons.append(f"High AI detection confidence ({conf_pct}%)")
         elif conf_pct >= 70:

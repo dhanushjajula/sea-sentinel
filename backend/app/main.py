@@ -593,45 +593,17 @@ def run_ablation_benchmark():
 # -----------------------------------------------------------------
 @app.get("/api/results/{analysis_id}")
 def get_survey_results(analysis_id: str):
-    """Retrieves historical survey session results from SQLite database."""
+    """Retrieves historical survey session results from SQLite database or cache."""
     if analysis_id in CACHED_ANALYSES:
-        return CACHED_ANALYSES[analysis_id]
+        data = dict(CACHED_ANALYSES[analysis_id])
+        data["session_id"] = data.get("analysis_id", analysis_id)
+        return data
 
-    conn = sqlite3.connect(agent.audit_logger.db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM survey_runs WHERE analysis_id = ?", (analysis_id,))
-    run_row = cursor.fetchone()
-
-    if not run_row:
-        conn.close()
+    summary = agent.audit_logger.get_session_summary(analysis_id)
+    if not summary:
         raise HTTPException(status_code=404, detail=f"Survey analysis ID '{analysis_id}' not found.")
-
-    cursor.execute("SELECT * FROM target_detections WHERE analysis_id = ?", (analysis_id,))
-    target_rows = cursor.fetchall()
-    conn.close()
-
-    detections = []
-    for r in target_rows:
-        d = dict(r)
-        if d.get("bbox_json"):
-            try:
-                d["bbox"] = json.loads(d["bbox_json"])
-                d["pixel_bbox"] = d["bbox"]
-            except Exception:
-                pass
-        detections.append(d)
-
-    return {
-        "analysis_id": analysis_id,
-        "status": "retrieved_from_archive",
-        "timestamp": run_row["timestamp"],
-        "image_path": run_row["image_path"],
-        "georeferencing_case": run_row["georef_case"],
-        "total_detections": run_row["total_targets"],
-        "detections": detections
-    }
+    summary["analysis_id"] = summary.get("session_id", analysis_id)
+    return summary
 
 
 @app.get("/api/geospatial")
@@ -640,14 +612,14 @@ def get_geospatial_features(format: str = Query("geojson", pattern="^(geojson|cs
     conn = sqlite3.connect(agent.audit_logger.db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM target_detections WHERE latitude IS NOT NULL AND longitude IS NOT NULL")
+    cursor.execute("SELECT * FROM target_detections WHERE lat IS NOT NULL AND lon IS NOT NULL")
     rows = cursor.fetchall()
     conn.close()
 
     if format == "csv":
-        output = "object_id,analysis_id,timestamp,class,confidence,latitude,longitude,uncertainty_m,risk_level\n"
+        output = "object_id,session_id,class,confidence,latitude,longitude,uncertainty_m,risk_level\n"
         for r in rows:
-            output += f"{r['object_id']},{r['analysis_id']},{r['timestamp']},{r['class']},{r['calibrated_confidence']},{r['latitude']},{r['longitude']},{r['uncertainty_m']},{r['hazard_risk']}\n"
+            output += f"{r['object_id']},{r['session_id']},{r['class_name']},{r['calibrated_confidence']},{r['lat']},{r['lon']},1.5,{r['risk_score']}\n"
         return Response(content=output, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=sea_sentinel_geospatial.csv"})
 
     features = []
@@ -656,16 +628,16 @@ def get_geospatial_features(format: str = Query("geojson", pattern="^(geojson|cs
             "type": "Feature",
             "geometry": {
                 "type": "Point",
-                "coordinates": [float(r["longitude"]), float(r["latitude"])]
+                "coordinates": [float(r["lon"]), float(r["lat"])]
             },
             "properties": {
                 "object_id": r["object_id"],
-                "analysis_id": r["analysis_id"],
-                "class": r["class"],
+                "analysis_id": r["session_id"],
+                "class": r["class_name"],
                 "confidence": r["calibrated_confidence"],
-                "hazard_risk": r["hazard_risk"],
-                "uncertainty_m": r["uncertainty_m"],
-                "georef_case": r["georef_case"]
+                "hazard_risk": r["risk_score"],
+                "latitude": r["lat"],
+                "longitude": r["lon"]
             }
         })
 
@@ -679,13 +651,8 @@ def get_geospatial_features(format: str = Query("geojson", pattern="^(geojson|cs
 @app.get("/api/high-risk")
 def get_high_risk_targets():
     """Lists urgent navigational hazards requiring immediate intervention."""
-    conn = sqlite3.connect(agent.audit_logger.db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM target_detections WHERE hazard_risk = 'HIGH' ORDER BY calibrated_confidence DESC LIMIT 20")
-    rows = cursor.fetchall()
-    conn.close()
-    return {"status": "success", "count": len(rows), "high_risk_targets": [dict(r) for r in rows]}
+    targets = agent.audit_logger.query_high_risk_targets(limit=20)
+    return {"status": "success", "count": len(targets), "high_risk_targets": targets}
 
 
 # -----------------------------------------------------------------

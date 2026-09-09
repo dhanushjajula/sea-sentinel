@@ -31,7 +31,16 @@ class YOLODetector:
         self.model_path = model_path
         self.conf_thresh = conf_thresh
         self.iou_thresh = iou_thresh
-        self.device = device
+
+        # Resolve device for Ultralytics (which rejects 'auto')
+        if device == "auto" or device is None:
+            try:
+                import torch
+                self.device = "0" if torch.cuda.is_available() else "cpu"
+            except Exception:
+                self.device = "cpu"
+        else:
+            self.device = device
         self.model = None
         self.is_model_loaded = False
 
@@ -65,7 +74,18 @@ class YOLODetector:
                 print(f"[YOLODetector] Warning: Failed to load weights from {self.model_path}: {e}")
                 self.is_model_loaded = False
         else:
-            self.is_model_loaded = False
+            # Fallback to local yolo11n.pt if custom checkpoint not found
+            backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            fallback_pt = os.path.join(backend_dir, "yolo11n.pt")
+            if os.path.exists(fallback_pt):
+                try:
+                    self.model = YOLO(fallback_pt)
+                    self.is_model_loaded = True
+                except Exception as e:
+                    print(f"[YOLODetector] Warning: Failed to load fallback yolo11n.pt: {e}")
+                    self.is_model_loaded = False
+            else:
+                self.is_model_loaded = False
 
     def detect(
         self,
