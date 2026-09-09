@@ -9,6 +9,10 @@ class GISMap {
     this.containerId = containerId;
     this.map = null;
     this.markers = {};
+    if (typeof L === 'undefined') {
+      console.warn("Leaflet (L) is not defined yet. GISMap initialization deferred.");
+      return;
+    }
     this.surveyLayers = L.layerGroup();
     this.gisLayers = {
       coral_reefs: L.layerGroup(),

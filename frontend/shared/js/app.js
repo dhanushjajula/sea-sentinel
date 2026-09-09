@@ -24,24 +24,41 @@ class DashboardApp {
 
   async _init() {
     // 0. Initialize Splash Screen Intro
-    this._initSplashScreen();
+    try {
+      this._initSplashScreen();
+    } catch (e) {
+      console.warn("Splash screen init warning:", e);
+    }
 
-    // 1. Initialize Visual Engines
-    this.waterfall = new WaterfallViewer('sonarCanvas');
-    this.map = new GISMap('leafletMap');
+    try {
+      // 1. Initialize Visual Engines
+      this.waterfall = new WaterfallViewer('sonarCanvas');
+      this.map = new GISMap('leafletMap');
 
-    // 2. Setup Event Handlers
-    this._setupEventListeners();
+      // 2. Setup Event Handlers
+      this._setupEventListeners();
 
-    // 3. Check Backend Health & Model Status
-    await this.checkBackendStatus();
+      // 3. Check Backend Health & Model Status
+      await this.checkBackendStatus();
 
-    // 4. Load Sample Catalog
-    await this.loadSampleCatalog();
+      // 4. Load Sample Catalog
+      await this.loadSampleCatalog();
 
-    // 5. Automatically select and run the first sample
-    if (this.samples && this.samples.length > 0) {
-      await this.selectSampleMission(this.samples[0].id, { autoRun: true });
+      // 5. Automatically select and run the first sample
+      if (this.samples && this.samples.length > 0) {
+        await this.selectSampleMission(this.samples[0].id, { autoRun: true });
+      }
+    } catch (err) {
+      console.error("DashboardApp init error:", err);
+    } finally {
+      // Guaranteed splash dismissal fallback
+      setTimeout(() => {
+        const splash = document.getElementById('appSplashScreen');
+        if (splash && splash.style.display !== 'none') {
+          splash.classList.add('fade-out');
+          setTimeout(() => { splash.style.display = 'none'; }, 600);
+        }
+      }, 1000);
     }
   }
 
@@ -59,7 +76,7 @@ class DashboardApp {
       splash.classList.add('fade-out');
       setTimeout(() => {
         splash.style.display = 'none';
-      }, 850);
+      }, 600);
     };
 
     splash.addEventListener('click', dismissSplash);
@@ -70,10 +87,10 @@ class DashboardApp {
     window.addEventListener('keydown', keyHandler);
 
     const steps = [
-      { progress: 25, text: 'INITIALIZING PARALLEL YOLO + U-NET PIPELINES...', delay: 200 },
-      { progress: 55, text: 'CALIBRATING MULTI-SIGNAL FUSION ENGINE...', delay: 650 },
-      { progress: 85, text: 'CALIBRATING GEOMATICS & HIGH-RECALL VERIFIER...', delay: 1100 },
-      { progress: 100, text: 'DUAL-PATH SYSTEMS ONLINE · ENTERING DASHBOARD...', delay: 1600 },
+      { progress: 30, text: 'INITIALIZING PARALLEL YOLO + U-NET PIPELINES...', delay: 150 },
+      { progress: 65, text: 'CALIBRATING MULTI-SIGNAL FUSION ENGINE...', delay: 400 },
+      { progress: 90, text: 'CALIBRATING GEOMATICS & HIGH-RECALL VERIFIER...', delay: 750 },
+      { progress: 100, text: 'DUAL-PATH SYSTEMS ONLINE · ENTERING DASHBOARD...', delay: 1100 },
     ];
 
     steps.forEach(({ progress, text, delay }) => {
@@ -87,7 +104,7 @@ class DashboardApp {
 
     setTimeout(() => {
       dismissSplash();
-    }, 2100);
+    }, 1400);
   }
 
   async checkBackendStatus() {
