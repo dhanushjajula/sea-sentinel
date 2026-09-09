@@ -403,6 +403,128 @@ class SeaSentinelAPI {
     }
     return { status: "offline", surveys: [] };
   }
+
+  // -------------------------------------------------------------
+  // Adaptive Learning & Error Prevention Subsystem API
+  // -------------------------------------------------------------
+  async submitStructuredReview(payload) {
+    const res = await fetch(`${this.baseUrl}/api/learning/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Review submission failed" }));
+      throw new Error(err.detail || "Review submission failed");
+    }
+    return await res.json();
+  }
+
+  async getActiveLearningQueue(limit = 50) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/active-queue?limit=${limit}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Active learning queue unreachable:", e);
+    }
+    return { status: "offline", queue: [] };
+  }
+
+  async getErrorMemory(limit = 50) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/error-memory?limit=${limit}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Error memory unreachable:", e);
+    }
+    return { status: "offline", error_distribution: {}, recurring_patterns: [], recent_errors: [] };
+  }
+
+  async getUnknownClasses() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/unknown-classes`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Unknown classes unreachable:", e);
+    }
+    return { status: "offline", candidates: [] };
+  }
+
+  async promoteUnknownClass(className) {
+    const res = await fetch(`${this.baseUrl}/api/learning/unknown-classes/${encodeURIComponent(className)}/promote`, {
+      method: "POST"
+    });
+    return await res.json();
+  }
+
+  async triggerChallengerTraining(targetModel = "yolo", epochs = 5, batchSize = 8, device = "cpu", candidateVersion = null) {
+    const res = await fetch(`${this.baseUrl}/api/learning/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_model: targetModel,
+        epochs: epochs,
+        batch_size: batchSize,
+        device: device,
+        candidate_version: candidateVersion
+      })
+    });
+    return await res.json();
+  }
+
+  async getChallengerTrainingStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/train/status`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Training status unreachable:", e);
+    }
+    return { is_training: false };
+  }
+
+  async getChampionChallengerEvaluation(modelType = "yolo", candidateVersion = null) {
+    try {
+      let url = `${this.baseUrl}/api/learning/champion-challenger?model_type=${encodeURIComponent(modelType)}`;
+      if (candidateVersion) url += `&candidate_version=${encodeURIComponent(candidateVersion)}`;
+      const res = await fetch(url);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Champion challenger evaluation unreachable:", e);
+    }
+    return null;
+  }
+
+  async deployChallenger(modelType, challengerVersion, challengerCheckpoint = null) {
+    const res = await fetch(`${this.baseUrl}/api/learning/deploy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model_type: modelType,
+        challenger_version: challengerVersion,
+        challenger_checkpoint: challengerCheckpoint
+      })
+    });
+    return await res.json();
+  }
+
+  async rollbackChallenger(modelType) {
+    const res = await fetch(`${this.baseUrl}/api/learning/rollback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_type: modelType })
+    });
+    return await res.json();
+  }
+
+  async getAdaptiveLearningDashboard() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/dashboard`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Learning dashboard endpoint unreachable:", e);
+    }
+    return null;
+  }
 }
 
 window.apiService = new SeaSentinelAPI();

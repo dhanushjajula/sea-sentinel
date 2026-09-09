@@ -54,6 +54,15 @@ from database.sync_manager import SyncManager
 from ai.model_manager import ModelManager
 from ai.analytics.change_detector import SurveyChangeDetector
 
+from ai.learning.review_intelligence import ReviewIntelligenceEngine, StructuredErrorRecord
+from ai.learning.error_memory import ErrorMemoryEngine
+from ai.learning.active_learner import ActiveLearningEngine
+from ai.learning.unknown_objects import UnknownObjectManager
+from ai.learning.dataset_manager import AdaptiveDatasetManager
+from ai.learning.trainers import ModelRetrainingOrchestrator
+from ai.learning.evaluator import ChampionChallengerEvaluator
+from ai.learning.deployment_manager import AdaptiveDeploymentManager
+
 
 class SIHPipelineAgent:
     """
@@ -147,13 +156,27 @@ class SIHPipelineAgent:
         self.change_detector = SurveyChangeDetector(match_radius_m=35.0)
         self.model_manager = ModelManager(agent_instance=self)
 
-        # Continuous Learning & Human Feedback Engines
+        # Continuous Learning, Feedback & Error Prevention Engines
         self.correction_memory = CorrectionMemory()
         self.nlu_engine = FeedbackNLUEngine()
         self.dataset_accumulator = FeedbackDatasetAccumulator()
         self.learner = YOLOLearner(
             on_model_deployed=self.hot_reload_yolo_model
         )
+
+        # Advanced Adaptive Learning & Error Prevention Subsystems
+        self.review_intelligence = ReviewIntelligenceEngine()
+        self.error_memory = ErrorMemoryEngine()
+        self.active_learner = ActiveLearningEngine(error_memory=self.error_memory)
+        self.unknown_manager = UnknownObjectManager()
+        self.dataset_manager = AdaptiveDatasetManager()
+        self.retraining_orchestrator = ModelRetrainingOrchestrator()
+        self.champion_challenger = ChampionChallengerEvaluator(error_memory=self.error_memory)
+        self.deployment_manager = AdaptiveDeploymentManager()
+
+        # Version tracking
+        self.current_yolo_version = "YOLO-v3.2"
+        self.current_unet_version = "UNet-v2.5"
 
         # Hardware-Aware Acceleration & Warmup
         self.hardware_profile = HardwareDetector.get_hardware_profile()
@@ -162,8 +185,10 @@ class SIHPipelineAgent:
         except Exception:
             pass
 
-    def hot_reload_yolo_model(self, new_checkpoint_path: str):
+    def hot_reload_yolo_model(self, new_checkpoint_path: str, version: Optional[str] = None):
         """Hot-reloads the YOLO detector with newly fine-tuned weights without restarting the server."""
+        if version:
+            self.current_yolo_version = version
         if os.path.exists(new_checkpoint_path):
             self.detector.model_path = new_checkpoint_path
             self.detector._load_model()
@@ -683,9 +708,15 @@ class SIHPipelineAgent:
                 width_m=dims.get("width_m", 1.0)
             )
             rec["habitat_overlaps"] = gis_res.get("habitat_overlaps", [])
-            rec["nearest_infrastructure_m"] = gis_res.get("nearest_infrastructure_m")
-            rec["ecological_risk_category"] = gis_res.get("risk_category", "MODERATE")
-            rec["gis_risk_summary"] = gis_res.get("hazard_summary")
+            # Active Learning Uncertainty Evaluation
+            al_res = self.active_learner.evaluate_detection_for_review(
+                image_id=analysis_id,
+                detection=det,
+                crop_image=patch_crop
+            )
+            rec["needs_human_review"] = al_res.get("needs_human_review", False)
+            rec["uncertainty_score"] = al_res.get("uncertainty_score", 0.0)
+            rec["active_learning_reasons"] = al_res.get("priority_reasons", [])
 
             final_objects.append(rec)
 
