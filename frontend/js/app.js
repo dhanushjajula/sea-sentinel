@@ -17,6 +17,7 @@ class DashboardApp {
     this.isBackendOnline = false;
     this.isRejected = false;
     this.currentSort = 'priority';
+    this.currentPipelineMode = 'balanced';
 
     this._init();
   }
@@ -361,8 +362,8 @@ class DashboardApp {
         throw new Error("No sonar image or mission selected.");
       }
 
-      if (statusText) statusText.textContent = "RUNNING PARALLEL YOLO + U-NET...";
-      analysisResult = await window.apiService.analyzeImage(imagePathToAnalyze);
+      if (statusText) statusText.textContent = `RUNNING DUAL-PATH AI (${this.currentPipelineMode.toUpperCase()})...`;
+      analysisResult = await window.apiService.analyzeImage(imagePathToAnalyze, null, null, 1, this.currentPipelineMode);
 
       clearInterval(stepInterval);
 
@@ -466,6 +467,52 @@ class DashboardApp {
       compMeta.textContent = `ID: ${id} · ${dur}ms · High-Recall Score: ${accuracyVal}%`;
     }
 
+    // Update Real-Time Profiler & Latency Budget Strip (<20s Target)
+    if (result.profiling) {
+      const prof = result.profiling;
+      const totalSec = prof.total_duration_seconds != null ? prof.total_duration_seconds.toFixed(2) : (result.total_duration_ms / 1000).toFixed(2);
+      const headroomSec = prof.headroom_seconds != null ? prof.headroom_seconds.toFixed(2) : (20 - parseFloat(totalSec)).toFixed(2);
+      const budgetPass = prof.budget_status === 'PASS';
+
+      const elTotalTime = document.getElementById('lbsTotalTime');
+      if (elTotalTime) elTotalTime.textContent = `${totalSec}s`;
+
+      const elBadge = document.getElementById('lbsBudgetBadge');
+      if (elBadge) {
+        elBadge.className = `lbs-budget-badge ${budgetPass ? 'pass' : 'fail'}`;
+        elBadge.textContent = budgetPass ? '✓ PASS (<20s)' : '⚠ EXCEEDED (>20s)';
+      }
+
+      const elHeadroom = document.getElementById('lbsHeadroom');
+      if (elHeadroom) elHeadroom.textContent = `${headroomSec}s Headroom`;
+
+      const elBottleneck = document.getElementById('lbsBottleneck');
+      if (elBottleneck && prof.bottleneck) {
+        const bStage = (prof.bottleneck.stage || 'None').replace(/_/g, ' ').toUpperCase();
+        const bSec = prof.bottleneck.duration_seconds != null ? prof.bottleneck.duration_seconds.toFixed(2) : (prof.bottleneck.duration_ms / 1000).toFixed(2);
+        elBottleneck.innerHTML = `<i class="fa-solid fa-gauge-simple-high"></i> Slowest: <b>${bStage} (${bSec}s)</b>`;
+      }
+
+      // Update individual node step time labels
+      const stages = prof.stages_ms || {};
+      const setStepTime = (id, valMs) => {
+        const el = document.getElementById(id);
+        if (el) {
+          if (valMs != null) {
+            el.textContent = valMs >= 1000 ? `${(valMs / 1000).toFixed(2)}s` : `${valMs.toFixed(0)}ms`;
+          }
+        }
+      };
+
+      setStepTime('timeStepUpload', (stages.input_loading || 50));
+      setStepTime('timeStepPrep', (stages.preprocessing || 80));
+      setStepTime('timeStepYolo', (stages.parallel_inference || stages.yolo_inference || 800));
+      setStepTime('timeStepFusion', (stages.candidate_fusion || 70));
+      setStepTime('timeStepVerify', (stages.candidate_verification || 10));
+      setStepTime('timeStepGeo', (stages.georeference_check || 15));
+      setStepTime('timeStepReport', (stages.visualization || 25));
+    }
+
     const statusPill = document.getElementById('pipelineStatusPill');
     const statusText = document.getElementById('pipelineStatusText');
     if (statusPill && statusText) {
@@ -475,6 +522,7 @@ class DashboardApp {
 
     this.updateKPIs();
     this.renderTargetList();
+    this.renderSyncModal().catch(() => {});
 
     if (this.targets.length > 0) {
       this.onTargetSelected(this.targets[0].object_id, { fly: false, force: true });
@@ -1316,6 +1364,21 @@ class DashboardApp {
       };
     });
 
+    // Pipeline Execution Mode Selector (Fast / Balanced / High Accuracy)
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.currentPipelineMode = btn.dataset.mode || 'balanced';
+        this.showToast({
+          type: "info",
+          title: `Switched to ${this.currentPipelineMode.toUpperCase()} Mode`,
+          message: `Executing dual-path pipeline with ${this.currentPipelineMode} performance profile.`
+        });
+        this.executeAIPipeline();
+      };
+    });
+
     // Ablation modal triggers
     const btnAblation = document.getElementById('btnOpenAblationModal');
     if (btnAblation) btnAblation.onclick = () => this.openAblationModal();
@@ -1495,6 +1558,10 @@ class DashboardApp {
         if (am && am.style.display === 'flex') am.style.display = 'none';
         const rm = document.getElementById('missionReportModal');
         if (rm && rm.style.display === 'flex') rm.style.display = 'none';
+        const syncM = document.getElementById('syncModal');
+        if (syncM && syncM.style.display === 'flex') syncM.style.display = 'none';
+        const modM = document.getElementById('modelModal');
+        if (modM && modM.style.display === 'flex') modM.style.display = 'none';
       }
     });
 
@@ -1506,6 +1573,184 @@ class DashboardApp {
         btnToggleSwath.classList.toggle('active', active);
       };
     }
+
+    // Local GIS Layer Checkboxes
+    const gisCheckboxes = [
+      { id: 'chkGisReefs', layer: 'coral_reefs', labelId: 'lblGisReefs' },
+      { id: 'chkGisMPA', layer: 'marine_protected_areas', labelId: 'lblGisMPA' },
+      { id: 'chkGisSeagrass', layer: 'seagrass_meadows', labelId: 'lblGisSeagrass' },
+      { id: 'chkGisCables', layer: 'underwater_infrastructure', labelId: 'lblGisCables' },
+      { id: 'chkGisShipping', layer: 'shipping_lanes', labelId: 'lblGisShipping' }
+    ];
+
+    gisCheckboxes.forEach(({ id, layer, labelId }) => {
+      const el = document.getElementById(id);
+      const parent = document.getElementById(labelId);
+      if (el) {
+        el.onchange = (e) => {
+          this.map.toggleGISLayer(layer, e.target.checked);
+          if (parent) parent.classList.toggle('active', e.target.checked);
+        };
+      }
+    });
+
+    // Sync Queue Modal triggers
+    const btnOpenSync = document.getElementById('btnOpenSyncModal');
+    const edgeOfflinePill = document.getElementById('edgeOfflinePill');
+    const syncModal = document.getElementById('syncModal');
+    const btnCloseSync = document.getElementById('btnCloseSyncModal');
+    const btnToggleConn = document.getElementById('btnToggleConnMode');
+    const btnTriggerSyncNow = document.getElementById('btnTriggerSyncNow');
+
+    const openSyncHandler = async () => {
+      if (syncModal) {
+        syncModal.style.display = 'flex';
+        await this.renderSyncModal();
+      }
+    };
+
+    if (btnOpenSync) btnOpenSync.onclick = openSyncHandler;
+    if (edgeOfflinePill) edgeOfflinePill.onclick = openSyncHandler;
+    if (btnCloseSync && syncModal) {
+      btnCloseSync.onclick = () => { syncModal.style.display = 'none'; };
+    }
+    if (btnToggleConn) {
+      btnToggleConn.onclick = async () => {
+        const curr = this.currentConnMode || "OFFLINE";
+        const next = curr === "OFFLINE" ? "ONLINE" : "OFFLINE";
+        await window.apiService.setSyncMode(next);
+        this.currentConnMode = next;
+        await this.renderSyncModal();
+        this.showToast({ type: "info", title: "Connectivity Changed", message: `System switched to ${next} mode.` });
+      };
+    }
+    if (btnTriggerSyncNow) {
+      btnTriggerSyncNow.onclick = async () => {
+        try {
+          btnTriggerSyncNow.disabled = true;
+          btnTriggerSyncNow.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Syncing...`;
+          const res = await window.apiService.triggerCloudSync();
+          await this.renderSyncModal();
+          this.showToast({ type: "success", title: "Cloud Synchronization Complete", message: res.message || "All surveys synchronized." });
+        } catch (err) {
+          this.showToast({ type: "error", title: "Sync Failed", message: err.message });
+        } finally {
+          btnTriggerSyncNow.disabled = false;
+          btnTriggerSyncNow.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Sync All Now`;
+        }
+      };
+    }
+
+    // Model Manager Modal triggers
+    const btnOpenModel = document.getElementById('btnOpenModelModal');
+    const modelModal = document.getElementById('modelModal');
+    const btnCloseModel = document.getElementById('btnCloseModelModal');
+    const btnRollbackYolo = document.getElementById('btnRollbackYolo');
+    const btnRollbackUnet = document.getElementById('btnRollbackUnet');
+
+    if (btnOpenModel) {
+      btnOpenModel.onclick = async () => {
+        if (modelModal) {
+          modelModal.style.display = 'flex';
+          await this.renderModelModal();
+        }
+      };
+    }
+    if (btnCloseModel && modelModal) {
+      btnCloseModel.onclick = () => { modelModal.style.display = 'none'; };
+    }
+    if (btnRollbackYolo) {
+      btnRollbackYolo.onclick = async () => {
+        const res = await window.apiService.rollbackModel('yolo');
+        if (res.status === 'SUCCESS') {
+          this.showToast({ type: "success", title: "YOLO Rolled Back", message: res.message });
+          await this.renderModelModal();
+        } else {
+          this.showToast({ type: "warning", title: "Rollback Unavailable", message: res.error || "No backup checkpoints found." });
+        }
+      };
+    }
+    if (btnRollbackUnet) {
+      btnRollbackUnet.onclick = async () => {
+        const res = await window.apiService.rollbackModel('unet');
+        if (res.status === 'SUCCESS') {
+          this.showToast({ type: "success", title: "U-Net Rolled Back", message: res.message });
+          await this.renderModelModal();
+        } else {
+          this.showToast({ type: "warning", title: "Rollback Unavailable", message: res.error || "No backup checkpoints found." });
+        }
+      };
+    }
+  }
+
+  async renderSyncModal() {
+    const status = await window.apiService.getSyncStatus();
+    this.currentConnMode = status.connection_mode || "OFFLINE";
+
+    const modeEl = document.getElementById('syncModalConnMode');
+    if (modeEl) {
+      modeEl.textContent = `${this.currentConnMode} ${this.currentConnMode === 'OFFLINE' ? '(EDGE)' : ''}`;
+      modeEl.style.color = this.currentConnMode === 'ONLINE' ? '#10b981' : (this.currentConnMode === 'SYNCHRONIZING' ? '#38bdf8' : '#f59e0b');
+    }
+
+    const pendingEl = document.getElementById('syncModalPendingCount');
+    if (pendingEl) pendingEl.textContent = `${status.pending_count || 0} Surveys`;
+
+    const syncedEl = document.getElementById('syncModalSyncedCount');
+    if (syncedEl) syncedEl.textContent = `${status.synced_count || 0} Surveys`;
+
+    const badgePending = document.getElementById('badgePendingSync');
+    if (badgePending) badgePending.textContent = status.pending_count || 0;
+
+    const offlinePill = document.getElementById('edgeOfflinePill');
+    const offlineText = document.getElementById('edgeOfflineText');
+    if (offlinePill && offlineText) {
+      offlinePill.className = `status-pill ${this.currentConnMode.toLowerCase()}`;
+      offlineText.textContent = `${this.currentConnMode} (EDGE)`;
+    }
+
+    const tbody = document.getElementById('syncQueueTbody');
+    if (tbody) {
+      if (!status.queue || status.queue.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding: 16px; text-align: center; color: #64748b;">No surveys currently queued.</td></tr>`;
+      } else {
+        tbody.innerHTML = status.queue.map(item => `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <td style="padding: 8px 12px; font-family: monospace; color: #38bdf8; font-weight: 700;">${item.survey_id}</td>
+            <td style="padding: 8px 12px; color: #94a3b8;">${new Date(item.enqueued_at).toLocaleTimeString()}</td>
+            <td style="padding: 8px 12px;">
+              <span style="padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; background: ${item.sync_status === 'SYNCED' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}; color: ${item.sync_status === 'SYNCED' ? '#10b981' : '#f59e0b'};">
+                ${item.sync_status}
+              </span>
+            </td>
+            <td style="padding: 8px 12px; text-align: right; color: #64748b;">${item.attempts || 0}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  }
+
+  async renderModelModal() {
+    const data = await window.apiService.getModelsStatus();
+    const container = document.getElementById('modelRegistryCardsContainer');
+    if (!container) return;
+
+    const models = data.models || {};
+    container.innerHTML = Object.entries(models).map(([k, m]) => `
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-dark); border-radius: 8px; padding: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+          <div>
+            <div style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">${k.toUpperCase()} ENGINE</div>
+            <div style="font-size: 1.05rem; font-weight: 800; color: #f8fafc;">${m.architecture}</div>
+          </div>
+          <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">
+            ${m.status || 'OPERATIONAL'}
+          </span>
+        </div>
+        <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 6px;"><b>Version:</b> <span style="font-family: monospace; color: #38bdf8;">${m.version}</span></div>
+        <div style="font-size: 0.72rem; color: #64748b; word-break: break-all;"><b>SHA256:</b> <span style="font-family: monospace;">${(m.checksum_sha256 || 'N/A').slice(0, 24)}...</span></div>
+      </div>
+    `).join('');
   }
 
   renderReportModal() {

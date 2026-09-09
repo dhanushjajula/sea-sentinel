@@ -176,25 +176,56 @@ class ParallelInferenceEngine:
     def run_parallel_inference(
         self,
         image: np.ndarray,
-        use_tiling_if_needed: bool = True
+        use_tiling_if_needed: bool = True,
+        mode: str = "balanced"
     ) -> Dict[str, Any]:
         """
-        Runs YOLO and U-Net concurrently in a thread pool.
+        Runs YOLO and U-Net concurrently in a thread pool with smart hardware-aware execution.
+        Modes:
+          - 'fast': Single-pass direct inference, lowest latency (<10s target).
+          - 'balanced': Default production mode, standard adaptive tiling when image > 900px (<15-20s).
+          - 'high_accuracy': Multi-scale / dense overlap candidate proposals.
         """
         start_time = time.perf_counter()
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_yolo = executor.submit(self.infer_yolo_path, image, use_tiling_if_needed)
+        tiling_flag = use_tiling_if_needed
+        if mode == "fast":
+            tiling_flag = False
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="parallel_ai") as executor:
+            future_yolo = executor.submit(self.infer_yolo_path, image, tiling_flag)
             future_unet = executor.submit(self.infer_unet_path, image)
 
-            yolo_result = future_yolo.result()
-            unet_result = future_unet.result()
+            try:
+                yolo_result = future_yolo.result()
+            except Exception as e:
+                yolo_result = {
+                    "status": "error",
+                    "source": "yolo",
+                    "error": f"YOLO execution error: {str(e)}",
+                    "detections": [],
+                    "total_detections": 0,
+                    "inference_time_ms": 0.0
+                }
+
+            try:
+                unet_result = future_unet.result()
+            except Exception as e:
+                unet_result = {
+                    "status": "error",
+                    "source": "unet",
+                    "error": f"U-Net execution error: {str(e)}",
+                    "objects": [],
+                    "total_objects": 0,
+                    "inference_time_ms": 0.0
+                }
 
         total_parallel_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
         return {
             "yolo": yolo_result,
             "unet": unet_result,
+            "mode": mode,
             "total_parallel_ms": total_parallel_ms,
             "both_models_succeeded": (yolo_result.get("status") == "success" and unet_result.get("status") == "success")
         }

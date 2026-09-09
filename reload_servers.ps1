@@ -1,5 +1,5 @@
 Write-Host "===================================================" -ForegroundColor Cyan
-Write-Host "  Sea Sentinel - Reloading Backend and Frontend" -ForegroundColor Cyan
+Write-Host "  Sea Sentinel 2.0 - Reloading Modular Servers" -ForegroundColor Cyan
 Write-Host "===================================================" -ForegroundColor Cyan
 
 # Terminate existing servers
@@ -28,4 +28,5 @@ Start-Process python -ArgumentList "-m http.server 3000 --directory frontend" -W
 Write-Host "`nServers successfully launched!" -ForegroundColor Green
 Write-Host " - Web Dashboard:    http://localhost:3000" -ForegroundColor Cyan
 Write-Host " - Backend API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
+Write-Host " - Architecture:     Production Modular Layout (frontend/ + backend/)" -ForegroundColor Cyan
 Write-Host "===================================================" -ForegroundColor Cyan

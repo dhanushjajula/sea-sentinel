@@ -199,12 +199,13 @@ class SeaSentinelAPI {
     return await res.json();
   }
 
-  async analyzeImage(imagePath, rasterMeta = null, navLog = null, frameIdx = 1) {
+  async analyzeImage(imagePath, rasterMeta = null, navLog = null, frameIdx = 1, mode = "balanced") {
     const payload = {
       image_path: imagePath,
       raster_meta: rasterMeta,
       nav_log: navLog,
-      frame_idx: frameIdx
+      frame_idx: frameIdx,
+      mode: mode
     };
 
     try {
@@ -310,6 +311,97 @@ class SeaSentinelAPI {
       console.warn("Feedback status unreachable:", e);
     }
     return { is_training: false };
+  }
+
+  // -------------------------------------------------------------
+  // Edge-First, Offline-Native API Methods
+  // -------------------------------------------------------------
+  async getGISLayers() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/gis/layers`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Local GIS layer endpoint unavailable:", e);
+    }
+    return null;
+  }
+
+  async getSyncStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/sync/status`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Sync status unreachable:", e);
+    }
+    return { connection_mode: "OFFLINE", pending_count: 0, synced_count: 0, queue: [] };
+  }
+
+  async triggerCloudSync() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/sync/trigger`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      return await res.json();
+    } catch (e) {
+      throw new Error(`Sync trigger failed: ${e.message}`);
+    }
+  }
+
+  async setSyncMode(mode) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/sync/mode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode })
+      });
+      return await res.json();
+    } catch (e) {
+      return { status: "error", message: e.message };
+    }
+  }
+
+  async getModelsStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/models/status`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Models status unreachable:", e);
+    }
+    return { status: "OFFLINE", models: {}, backups_available: 0 };
+  }
+
+  async updateModel(modelType, weightsPath, checksum = null, version = "vNext") {
+    const res = await fetch(`${this.baseUrl}/api/models/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model_type: modelType,
+        weights_path: weightsPath,
+        checksum_sha256: checksum,
+        version: version
+      })
+    });
+    return await res.json();
+  }
+
+  async rollbackModel(modelType) {
+    const res = await fetch(`${this.baseUrl}/api/models/rollback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_type: modelType })
+    });
+    return await res.json();
+  }
+
+  async getSurveyHistory(limit = 50) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/surveys/history?limit=${limit}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Surveys history unreachable:", e);
+    }
+    return { status: "offline", surveys: [] };
   }
 }
 
