@@ -74,17 +74,27 @@ class YOLODetector:
                 print(f"[YOLODetector] Warning: Failed to load weights from {self.model_path}: {e}")
                 self.is_model_loaded = False
         else:
-            # Fallback to local yolo11n.pt if custom checkpoint not found
+            # Fallback to custom trained best.pt in project root models/yolo/best.pt
             backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            fallback_pt = os.path.join(backend_dir, "yolo11n.pt")
-            if os.path.exists(fallback_pt):
-                try:
-                    self.model = YOLO(fallback_pt)
-                    self.is_model_loaded = True
-                except Exception as e:
-                    print(f"[YOLODetector] Warning: Failed to load fallback yolo11n.pt: {e}")
-                    self.is_model_loaded = False
-            else:
+            project_dir = os.path.dirname(backend_dir)
+            trained_candidates = [
+                os.path.join(project_dir, "models", "yolo", "best.pt"),
+                os.path.join(backend_dir, "models", "yolo", "best.pt"),
+                os.path.join(backend_dir, "yolo11n.pt")
+            ]
+            loaded = False
+            for cand in trained_candidates:
+                if os.path.exists(cand):
+                    try:
+                        self.model = YOLO(cand)
+                        self.is_model_loaded = True
+                        if hasattr(self.model, "names") and self.model.names:
+                            self.classes = {int(k): v for k, v in self.model.names.items()}
+                        loaded = True
+                        break
+                    except Exception as e:
+                        print(f"[YOLODetector] Warning: Failed to load from {cand}: {e}")
+            if not loaded:
                 self.is_model_loaded = False
 
     def detect(

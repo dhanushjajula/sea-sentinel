@@ -60,8 +60,22 @@ class UNetSegmenter:
         Loads trained checkpoint weights if available.
         """
         if not self.checkpoint_path or not os.path.exists(self.checkpoint_path):
-            self.is_model_loaded = False
-            return False
+            backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            project_dir = os.path.dirname(backend_dir)
+            fallbacks = [
+                os.path.join(project_dir, "models", "unet", "attention_unet_best.pt"),
+                os.path.join(backend_dir, "models", "unet", "attention_unet_best.pt"),
+                os.path.join(project_dir, "models", "unet", "attention_unet_latest.pt")
+            ]
+            found = False
+            for fb in fallbacks:
+                if os.path.exists(fb):
+                    self.checkpoint_path = fb
+                    found = True
+                    break
+            if not found:
+                self.is_model_loaded = False
+                return False
 
         try:
             checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
@@ -374,6 +388,12 @@ class UNetSegmenter:
             bw = int(stats[label, cv2.CC_STAT_WIDTH])
             bh = int(stats[label, cv2.CC_STAT_HEIGHT])
             cx, cy = centroids[label]
+
+            # Reject full-swath or boundary step artifacts (debris targets do not span > 55% of image height or > 65% width)
+            max_w_px = max(60, int(w * 0.65))
+            max_h_px = max(60, int(h * 0.55))
+            if (bw > max_w_px and bh > max_h_px) or bh > int(h * 0.70):
+                continue
 
             # Extract component mask
             comp_mask = (labels[y:y+bh, x:x+bw] == label).astype(np.uint8)
