@@ -199,12 +199,13 @@ class SeaSentinelAPI {
     return await res.json();
   }
 
-  async analyzeImage(imagePath, rasterMeta = null, navLog = null, frameIdx = 1) {
+  async analyzeImage(imagePath, rasterMeta = null, navLog = null, frameIdx = 1, mode = "balanced") {
     const payload = {
       image_path: imagePath,
       raster_meta: rasterMeta,
       nav_log: navLog,
-      frame_idx: frameIdx
+      frame_idx: frameIdx,
+      mode: mode
     };
 
     try {
@@ -310,6 +311,219 @@ class SeaSentinelAPI {
       console.warn("Feedback status unreachable:", e);
     }
     return { is_training: false };
+  }
+
+  // -------------------------------------------------------------
+  // Edge-First, Offline-Native API Methods
+  // -------------------------------------------------------------
+  async getGISLayers() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/gis/layers`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Local GIS layer endpoint unavailable:", e);
+    }
+    return null;
+  }
+
+  async getSyncStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/sync/status`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Sync status unreachable:", e);
+    }
+    return { connection_mode: "OFFLINE", pending_count: 0, synced_count: 0, queue: [] };
+  }
+
+  async triggerCloudSync() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/sync/trigger`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      return await res.json();
+    } catch (e) {
+      throw new Error(`Sync trigger failed: ${e.message}`);
+    }
+  }
+
+  async setSyncMode(mode) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/sync/mode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode })
+      });
+      return await res.json();
+    } catch (e) {
+      return { status: "error", message: e.message };
+    }
+  }
+
+  async getModelsStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/models/status`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Models status unreachable:", e);
+    }
+    return { status: "OFFLINE", models: {}, backups_available: 0 };
+  }
+
+  async updateModel(modelType, weightsPath, checksum = null, version = "vNext") {
+    const res = await fetch(`${this.baseUrl}/api/models/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model_type: modelType,
+        weights_path: weightsPath,
+        checksum_sha256: checksum,
+        version: version
+      })
+    });
+    return await res.json();
+  }
+
+  async rollbackModel(modelType) {
+    const res = await fetch(`${this.baseUrl}/api/models/rollback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_type: modelType })
+    });
+    return await res.json();
+  }
+
+  async getSurveyHistory(limit = 50) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/surveys/history?limit=${limit}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Surveys history unreachable:", e);
+    }
+    return { status: "offline", surveys: [] };
+  }
+
+  // -------------------------------------------------------------
+  // Adaptive Learning & Error Prevention Subsystem API
+  // -------------------------------------------------------------
+  async submitStructuredReview(payload) {
+    const res = await fetch(`${this.baseUrl}/api/learning/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Review submission failed" }));
+      throw new Error(err.detail || "Review submission failed");
+    }
+    return await res.json();
+  }
+
+  async getActiveLearningQueue(limit = 50) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/active-queue?limit=${limit}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Active learning queue unreachable:", e);
+    }
+    return { status: "offline", queue: [] };
+  }
+
+  async getErrorMemory(limit = 50) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/error-memory?limit=${limit}`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Error memory unreachable:", e);
+    }
+    return { status: "offline", error_distribution: {}, recurring_patterns: [], recent_errors: [] };
+  }
+
+  async getUnknownClasses() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/unknown-classes`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Unknown classes unreachable:", e);
+    }
+    return { status: "offline", candidates: [] };
+  }
+
+  async promoteUnknownClass(className) {
+    const res = await fetch(`${this.baseUrl}/api/learning/unknown-classes/${encodeURIComponent(className)}/promote`, {
+      method: "POST"
+    });
+    return await res.json();
+  }
+
+  async triggerChallengerTraining(targetModel = "yolo", epochs = 5, batchSize = 8, device = "cpu", candidateVersion = null) {
+    const res = await fetch(`${this.baseUrl}/api/learning/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_model: targetModel,
+        epochs: epochs,
+        batch_size: batchSize,
+        device: device,
+        candidate_version: candidateVersion
+      })
+    });
+    return await res.json();
+  }
+
+  async getChallengerTrainingStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/train/status`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Training status unreachable:", e);
+    }
+    return { is_training: false };
+  }
+
+  async getChampionChallengerEvaluation(modelType = "yolo", candidateVersion = null) {
+    try {
+      let url = `${this.baseUrl}/api/learning/champion-challenger?model_type=${encodeURIComponent(modelType)}`;
+      if (candidateVersion) url += `&candidate_version=${encodeURIComponent(candidateVersion)}`;
+      const res = await fetch(url);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Champion challenger evaluation unreachable:", e);
+    }
+    return null;
+  }
+
+  async deployChallenger(modelType, challengerVersion, challengerCheckpoint = null) {
+    const res = await fetch(`${this.baseUrl}/api/learning/deploy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model_type: modelType,
+        challenger_version: challengerVersion,
+        challenger_checkpoint: challengerCheckpoint
+      })
+    });
+    return await res.json();
+  }
+
+  async rollbackChallenger(modelType) {
+    const res = await fetch(`${this.baseUrl}/api/learning/rollback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_type: modelType })
+    });
+    return await res.json();
+  }
+
+  async getAdaptiveLearningDashboard() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/learning/dashboard`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Learning dashboard endpoint unreachable:", e);
+    }
+    return null;
   }
 }
 

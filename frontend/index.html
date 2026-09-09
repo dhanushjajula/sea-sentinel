@@ -528,17 +528,43 @@
           <span class="panel-title"><i class="fa-solid fa-brain"></i> AI Hydrographic Explainability</span>
           <span class="panel-tag green" id="explainabilityStatusTag">ACOUSTIC INFERENCE</span>
         </div>
-        <div class="explainability-body">
+
+        <!-- Target Navigation Bar for Easy Per-Debris Inspection -->
+        <div class="explainability-nav-bar" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; background:rgba(15,23,42,0.65); border-bottom:1px solid rgba(56,189,248,0.15); font-size:0.78rem;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" id="btnPrevExplainTarget" class="btn-micro" title="Previous Target" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#e2e8f0; border-radius:4px; padding:3px 8px; cursor:pointer;"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+            <select id="explainTargetSelect" class="sort-select" style="padding:2px 6px; font-size:0.75rem; background:rgba(10,15,29,0.9); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; border-radius:4px; max-width:140px;">
+              <option value="">Select Debris...</option>
+            </select>
+            <button type="button" id="btnNextExplainTarget" class="btn-micro" title="Next Target" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#e2e8f0; border-radius:4px; padding:3px 8px; cursor:pointer;">Next <i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+          <span id="explainTargetCounter" style="font-family:var(--font-mono); font-size:0.72rem; color:#94a3b8; font-weight:700;">-- / --</span>
+        </div>
+
+        <div class="explainability-body" id="explainabilityBodyContent">
+          <!-- 1. Executive Assessment & Debris Categorization -->
           <div class="explain-card">
             <div class="explain-card-header">
-              <span class="explain-card-title"><i class="fa-solid fa-file-waveform"></i> Executive Assessment</span>
+              <span class="explain-card-title"><i class="fa-solid fa-file-waveform"></i> Executive Assessment &amp; Categorization</span>
               <span class="sub-chip" id="targetClassChip">Awaiting Selection</span>
             </div>
             <p class="narrative-text" id="targetNarrative">
-              Select or hover any detected seabed target to inspect acoustic backscatter morphology, shadow verification, and intervention protocols.
+              Select or hover any detected seabed target to inspect acoustic backscatter morphology, shadow verification, accuracy score aspects, and intervention protocols.
             </p>
           </div>
 
+          <!-- 2. Accuracy Score & Multi-Aspect Contribution Breakdown -->
+          <div class="explain-card" id="targetAccuracyAspectsCard">
+            <div class="explain-card-header">
+              <span class="explain-card-title"><i class="fa-solid fa-chart-pie"></i> Accuracy Score &amp; Aspect Breakdown</span>
+              <span class="sub-chip cyan" id="targetAccuracyScoreBadge">98% Accuracy</span>
+            </div>
+            <div id="targetAccuracyAspectsList" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- 3. Acoustic Verification Telemetry & Physics -->
           <div class="explain-card">
             <div class="explain-card-header">
               <span class="explain-card-title"><i class="fa-solid fa-microchip"></i> Acoustic Verification Telemetry</span>
@@ -551,6 +577,7 @@
             </div>
           </div>
 
+          <!-- 4. Operational Intervention Protocol -->
           <div class="action-rec-wrap" id="targetActionRec">
             <div class="action-rec-badge idle">
               <i class="fa-solid fa-compass"></i> Awaiting target selection from inspector list.

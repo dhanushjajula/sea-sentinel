@@ -10,6 +10,13 @@ class GISMap {
     this.map = null;
     this.markers = {};
     this.surveyLayers = L.layerGroup();
+    this.gisLayers = {
+      coral_reefs: L.layerGroup(),
+      marine_protected_areas: L.layerGroup(),
+      seagrass_meadows: L.layerGroup(),
+      underwater_infrastructure: L.layerGroup(),
+      shipping_lanes: L.layerGroup()
+    };
     this.lastTargets = [];
     this.lastCoords = [];
     this.lastBounds = null;
@@ -17,6 +24,7 @@ class GISMap {
     this.lastZoom = 14;
     this.showSwath = true;
     this._initMap();
+    this.loadLocalGISLayers();
   }
 
   _initMap() {
@@ -419,6 +427,55 @@ class GISMap {
       this.map.removeLayer(this.surveyLayers);
     }
     return this.showSwath;
+  }
+
+  async loadLocalGISLayers() {
+    try {
+      const geojsonData = await window.apiService.getGISLayers();
+      if (!geojsonData || !geojsonData.features) return;
+
+      // Color mapping for marine features
+      const layerStyles = {
+        coral_reefs: { color: '#f43f5e', fillColor: '#f43f5e', fillOpacity: 0.25, weight: 2 },
+        marine_protected_areas: { color: '#10b981', fillColor: '#10b981', fillOpacity: 0.18, weight: 2, dashArray: '6, 6' },
+        seagrass_meadows: { color: '#84cc16', fillColor: '#84cc16', fillOpacity: 0.20, weight: 1.5 },
+        underwater_infrastructure: { color: '#f59e0b', weight: 3, dashArray: '4, 8' },
+        shipping_lanes: { color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.12, weight: 2, dashArray: '8, 8' }
+      };
+
+      for (const feat of geojsonData.features) {
+        const lKey = feat.properties && feat.properties.layer_key;
+        if (!lKey || !this.gisLayers[lKey]) continue;
+
+        const style = layerStyles[lKey] || { color: '#00e5ff', weight: 2 };
+        const geoLayer = L.geoJSON(feat, {
+          style: style,
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties || {};
+            layer.bindTooltip(`<b>${p.name || 'Marine Zone'}</b><br><span style="color:#94a3b8;">${p.type || ''} · ${p.sensitivity || 'PROTECTED'}</span>`, { sticky: true });
+          }
+        });
+
+        this.gisLayers[lKey].addLayer(geoLayer);
+      }
+
+      // Add all GIS layers to map by default
+      for (const group of Object.values(this.gisLayers)) {
+        group.addTo(this.map);
+      }
+    } catch (e) {
+      console.warn("Failed loading offline GIS layers:", e);
+    }
+  }
+
+  toggleGISLayer(layerKey, isVisible) {
+    const group = this.gisLayers[layerKey];
+    if (!group || !this.map) return;
+    if (isVisible) {
+      this.map.addLayer(group);
+    } else {
+      this.map.removeLayer(group);
+    }
   }
 
   invalidateSize() {
