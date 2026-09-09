@@ -35,6 +35,10 @@ from ai.measurement.risk_priority_engine import RiskPriorityEngine
 from ai.geospatial.geotagger import GeospatialEngine
 from agent.explainability import ExplainabilitySynthesizer
 from agent.audit_logger import SurveyAuditLogger
+from ai.feedback.correction_memory import CorrectionMemory
+from ai.feedback.nlu_engine import FeedbackNLUEngine
+from ai.feedback.dataset_accumulator import FeedbackDatasetAccumulator
+from ai.feedback.learner import YOLOLearner
 
 from inference.parallel_pipeline import ParallelInferenceEngine
 from inference.tiled_inference import TiledInferenceEngine
@@ -128,6 +132,20 @@ class SIHPipelineAgent:
         self.explainer = ExplainabilitySynthesizer()
         self.audit_logger = SurveyAuditLogger()
         self._bg_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="sea_sentinel_bg")
+
+        # Continuous Learning & Human Feedback Engines
+        self.correction_memory = CorrectionMemory()
+        self.nlu_engine = FeedbackNLUEngine()
+        self.dataset_accumulator = FeedbackDatasetAccumulator()
+        self.learner = YOLOLearner(
+            on_model_deployed=self.hot_reload_yolo_model
+        )
+
+    def hot_reload_yolo_model(self, new_checkpoint_path: str):
+        """Hot-reloads the YOLO detector with newly fine-tuned weights without restarting the server."""
+        if os.path.exists(new_checkpoint_path):
+            self.detector.model_path = new_checkpoint_path
+            self.detector._load_model()
 
     def analyze_image(
         self,
@@ -426,11 +444,30 @@ class SIHPipelineAgent:
             y2 = max(y1 + 1, min(h_raw, int(bbox.get("y2", h_raw))))
             patch_crop = raw_img[y1:y2, x1:x2]
 
+            # 6-mem: Correction Memory Lookup ("Similar previous mistake?")
+            is_memory_corrected = False
+            mem_match = {}
+            if hasattr(self, "correction_memory") and self.correction_memory:
+                mem_match = self.correction_memory.find_similar_mistake(
+                    candidate_crop=patch_crop,
+                    candidate_class=det.get("class", "unknown"),
+                    similarity_threshold=0.78
+                )
+                is_memory_corrected = mem_match.get("matched", False)
+                if is_memory_corrected:
+                    det["original_model_class"] = det.get("class")
+                    det["class"] = mem_match["corrected_class"]
+                    det["class_id"] = mem_match["corrected_class_id"]
+                    det["memory_corrected"] = True
+                    det["memory_match_details"] = mem_match
+
             # Pixel-level segmentation polygon extraction for every candidate
             poly = det.get("polygon")
             if not poly or len(poly) < 3:
                 seg_res = self.segmenter.segment_roi(patch_crop, offset_xy=(x1, y1))
                 poly = seg_res.get("polygon", [])
+                if seg_res.get("mask_available", False) and seg_res.get("mask") is not None:
+                    roi_masks[det.get("object_id")] = seg_res.get("mask")
 
             if not poly or len(poly) < 3:
                 poly = [
@@ -530,6 +567,29 @@ class SIHPipelineAgent:
             rec["yolo_bbox"] = det.get("yolo_bbox", bbox if "yolo" in det.get("sources", ["yolo"]) else None)
             rec["unet_bbox"] = det.get("unet_bbox", bbox if "unet" in det.get("sources", []) else None)
 
+            # Ensure coordinates and georeferencing status are populated for GIS mapping
+            has_valid_coords = (lat is not None and lon is not None)
+            rec["coordinates_available"] = has_valid_coords
+            rec["latitude"] = lat
+            rec["longitude"] = lon
+            rec["lat"] = lat
+            rec["lon"] = lon
+            rec["coordinate_system"] = (
+                raster_meta.get("crs") or "WGS84 (EPSG:4326)"
+            ) if has_valid_coords else "UNREFERENCED"
+            rec["georeferencing_case"] = effective_case
+            rec["dataset_profile"] = raster_meta.get("dataset_profile")
+            rec["memory_corrected"] = is_memory_corrected
+            if is_memory_corrected:
+                rec["original_model_class"] = mem_match.get("original_class")
+                rec["memory_match_details"] = mem_match
+                if explanation and "executive_narrative" in explanation:
+                    explanation["executive_narrative"] += (
+                        f" [Correction Memory: Reclassified from '{mem_match['original_class']}' "
+                        f"to '{mem_match['corrected_class']}' based on human feedback "
+                        f"({int(mem_match.get('similarity', 0.8)*100)}% acoustic match)]."
+                    )
+
             # Strict 3-Concept Separation & Scoring Data
             rec["detection_confidence"] = rp_scores["detection_confidence"]
             rec["calibrated_confidence"] = rp_scores["detection_confidence"]
@@ -584,8 +644,16 @@ class SIHPipelineAgent:
         # Save Preview Rasters
         output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs", "preprocessed")
         os.makedirs(output_dir, exist_ok=True)
+        raw_path = os.path.join(output_dir, f"{analysis_id}_raw.png")
         enhanced_path = os.path.join(output_dir, f"{analysis_id}_enhanced.png")
         annotated_path = os.path.join(output_dir, f"{analysis_id}_annotated.png")
+
+        # Save raw normalized preview raster for instantaneous report and UI loading
+        if raw_img is not None and isinstance(raw_img, np.ndarray):
+            raw_to_save = raw_img
+            if raw_to_save.dtype != np.uint8:
+                raw_to_save = cv2.normalize(raw_to_save, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+            cv2.imwrite(raw_path, raw_to_save)
 
         enhanced_img = prep_res.get("preprocessed_image")
         if enhanced_img is not None and isinstance(enhanced_img, np.ndarray):
@@ -781,6 +849,7 @@ class SIHPipelineAgent:
             "analysis_id": analysis_id,
             "status": "success",
             "image_path": image_path,
+            "raw_image_path": raw_path if os.path.exists(raw_path) else None,
             "enhanced_image_path": enhanced_path if os.path.exists(enhanced_path) else None,
             "annotated_image_path": annotated_path if os.path.exists(annotated_path) else None,
             "georeferencing_case": georef_case,

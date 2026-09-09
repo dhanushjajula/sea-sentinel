@@ -256,6 +256,61 @@ class SeaSentinelAPI {
       }
     };
   }
+
+  async submitFeedback(analysisId, objectId, comment, correctedClassOverride = null) {
+    const payload = {
+      analysis_id: analysisId,
+      object_id: objectId,
+      comment: comment,
+      corrected_class_override: correctedClassOverride
+    };
+
+    const res = await fetch(`${this.baseUrl}/api/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Feedback submission failed" }));
+      throw new Error(err.detail || "Failed to submit feedback");
+    }
+
+    return await res.json();
+  }
+
+  async getFeedbackMemory() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/feedback/memory`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn("Feedback memory endpoint unreachable:", e);
+    }
+    return { status: "error", corrections: [], stats: {} };
+  }
+
+  async triggerFineTuning(epochs = 5, batchSize = 8, dryRun = false) {
+    const res = await fetch(`${this.baseUrl}/api/feedback/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ epochs, batch_size: batchSize, dry_run: dryRun })
+    });
+    return await res.json();
+  }
+
+  async getLearnerStatus() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/feedback/status`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn("Feedback status unreachable:", e);
+    }
+    return { is_training: false };
+  }
 }
 
 window.apiService = new SeaSentinelAPI();

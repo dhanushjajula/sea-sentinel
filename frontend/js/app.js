@@ -127,6 +127,9 @@ class DashboardApp {
 
   async loadSampleCatalog() {
     this.samples = await window.apiService.fetchSamples();
+    if (this.samples && this.samples.length > 0) {
+      this.currentSample = this.samples[0];
+    }
     const container = document.getElementById('sampleChipsContainer');
     if (!container) return;
 
@@ -734,6 +737,27 @@ class DashboardApp {
           </div>
           <div style="display:flex; align-items:center; gap:4px;">
             <span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span>
+            <span class="hazard-badge ${risk}">${risk}</span>
+          </div>
+        </div>
+        <div class="target-card-tags">
+          <span class="chip-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
+          <span class="priority-badge ${isHigher ? 'higher' : 'lower'}">${isHigher ? '▲ HIGHER' : '▼ LOWER'}</span>
+          ${t.memory_corrected ? `<span class="chip-memory-corrected" title="Auto-corrected from ${t.original_model_class || 'previous'}" style="margin-left: 2px;"><i class="fa-solid fa-lightbulb"></i> Corrected</span>` : ''}
+          <button type="button" class="btn-target-feedback" data-obj-id="${t.object_id}" title="Provide human feedback / correct detection" style="margin-left: auto;"><i class="fa-solid fa-comment-dots"></i> Feedback</button>
+        </div>
+        <div class="target-card-metrics">
+          <div class="metric-item">
+            <span class="metric-lbl">Confidence</span>
+            <span class="metric-val cyan">${conf}%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-lbl">Accuracy</span>
+            <span class="metric-val green">${accStr}%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-lbl">Relief</span>
+            <span class="metric-val ${t.shadow_verified ? 'cyan' : 'gray'}">${t.shadow_verified ? 'Shadow Void' : 'Low Relief'}</span>
           </div>
         </div>
 
@@ -777,8 +801,38 @@ class DashboardApp {
         };
       }
 
+      const fbBtn = item.querySelector('.btn-target-feedback');
+      if (fbBtn) {
+        fbBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.openFeedbackModal(t.object_id);
+        };
+      }
+
       container.appendChild(item);
     });
+
+    // Synchronize Review System target dropdown
+    const reviewSelect = document.getElementById('reviewTargetSelect');
+    if (reviewSelect) {
+      reviewSelect.innerHTML = '';
+      if (!this.targets || this.targets.length === 0) {
+        reviewSelect.innerHTML = '<option value="">No targets detected</option>';
+      } else {
+        this.targets.forEach((t, idx) => {
+          const opt = document.createElement('option');
+          opt.value = t.object_id;
+          const cls = (t.class || 'unknown').replace(/_/g, ' ');
+          opt.textContent = `#${idx + 1} ${t.object_id} · ${cls}`;
+          reviewSelect.appendChild(opt);
+        });
+        if (this.selectedTargetId) {
+          reviewSelect.value = this.selectedTargetId;
+        } else if (this.targets.length > 0) {
+          reviewSelect.value = this.targets[0].object_id;
+        }
+      }
+    }
   }
 
   onTargetSelected(targetId, options = {}) {
@@ -791,6 +845,22 @@ class DashboardApp {
       if (isMatch && options.force) {
         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
+    });
+
+    // Synchronize Review System target selection
+    const revSelect = document.getElementById('reviewTargetSelect');
+    if (revSelect && revSelect.value !== targetId) {
+      revSelect.value = targetId;
+    }
+    const revBadge = document.getElementById('reviewTargetBadge');
+    if (revBadge) {
+      revBadge.textContent = targetId;
+    }
+    
+    // Synchronize Target List active styling
+    document.querySelectorAll('.target-card').forEach(el => {
+      const idEl = el.querySelector('.target-id');
+      el.classList.toggle('active', idEl && idEl.textContent.trim() === targetId);
     });
 
     this.waterfall.selectTarget(targetId);
@@ -1497,9 +1567,7 @@ class DashboardApp {
       const prioScore = d.priority_score != null ? Math.round(d.priority_score) : Math.round(conf * 0.95);
       const prioLevel = (d.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
       const hazardScore = d.hazard_score != null ? Math.round(d.hazard_score) : (risk === 'HIGH' ? 82 : 45);
-      const hazardLevel = (d.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-
-      tableRows += `
+      const hazardLevel = (d.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).      tableRows += `
         <tr>
           <td><b style="color:var(--cyan-beam); font-family:var(--font-mono);">#${idx + 1} ${d.object_id}</b></td>
           <td><b>${cleanClass}</b></td>
@@ -1655,7 +1723,6 @@ class DashboardApp {
           </tbody>
         </table>
       </div>
-      </div>
 
       <!-- 4. Individual Target Detailed Intelligence Dossiers -->
       <div class="report-section-title" style="margin-top: 28px;">
@@ -1665,6 +1732,218 @@ class DashboardApp {
         ${dossierCards || '<div style="grid-column: 1 / -1; padding:20px; color:#94a3b8; text-align:center;">No target dossiers generated.</div>'}
       </div>
     `;
+  }
+
+  openFeedbackModal(objectId) {
+    const target = this.targets.find(t => String(t.object_id) === String(objectId));
+    if (!target) return;
+
+    this.feedbackTarget = target;
+    const modal = document.getElementById('feedbackModal');
+    const summary = document.getElementById('feedbackTargetSummary');
+    const commentInput = document.getElementById('feedbackCommentInput');
+    const statusMsg = document.getElementById('feedbackStatusMsg');
+
+    if (!modal) return;
+
+    const conf = Math.round((target.calibrated_confidence || target.confidence || 0.8) * 100);
+    const cleanCls = (target.class || 'unknown').replace(/_/g, ' ');
+
+    if (summary) {
+      summary.innerHTML = `
+        <div class="summary-row"><span class="summary-lbl">Target:</span> <span class="summary-val">${target.object_id}</span></div>
+        <div class="summary-row"><span class="summary-lbl">YOLO Detection:</span> <span class="summary-val" style="color: var(--cyan-beam); text-transform: capitalize;">${cleanCls} (${conf}% Conf)</span></div>
+        ${target.memory_corrected ? `<div class="summary-row"><span class="summary-lbl">Memory Status:</span> <span class="summary-val" style="color: #38bdf8;">Corrected from '${target.original_model_class || ''}'</span></div>` : ''}
+      `;
+    }
+
+    if (commentInput) {
+      commentInput.value = '';
+    }
+    if (statusMsg) {
+      statusMsg.style.display = 'none';
+      statusMsg.textContent = '';
+      statusMsg.className = '';
+    }
+
+    modal.style.display = 'flex';
+    if (commentInput) commentInput.focus();
+  }
+
+  async submitCurrentFeedback() {
+    if (!this.feedbackTarget) return;
+
+    const commentInput = document.getElementById('feedbackCommentInput');
+    const statusMsg = document.getElementById('feedbackStatusMsg');
+    const submitBtn = document.getElementById('btnSubmitFeedback');
+
+    const comment = commentInput ? commentInput.value.trim() : '';
+    if (!comment) {
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusMsg.style.color = '#ef4444';
+        statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusMsg.textContent = 'Please enter a natural language comment explaining the correction.';
+      }
+      return;
+    }
+
+    const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+    }
+
+    try {
+      const analysisId = (this.currentAnalysisResult && this.currentAnalysisResult.analysis_id) || "latest";
+      const res = await window.apiService.submitFeedback(
+        analysisId,
+        this.feedbackTarget.object_id,
+        comment
+      );
+
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusMsg.style.color = '#10b981';
+        statusMsg.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusMsg.innerHTML = `<i class="fa-solid fa-circle-check"></i> <b>Learned:</b> Reclassified as <b>${res.corrected_class.replace(/_/g, ' ')}</b>. Saved to memory.`;
+      }
+
+      // Update local target record
+      this.feedbackTarget.original_model_class = res.original_class;
+      this.feedbackTarget.class = res.corrected_class;
+      this.feedbackTarget.class_id = res.corrected_class_id;
+      this.feedbackTarget.memory_corrected = true;
+      if (res.target && res.target.priority_level) {
+        this.feedbackTarget.priority_level = res.target.priority_level;
+        this.feedbackTarget.priority_label = res.target.priority_label;
+      }
+
+      // Re-render target cards to reflect new class and memory badge
+      this.renderTargetList();
+      this.onTargetSelected(this.feedbackTarget.object_id, { fly: false, force: true });
+
+      this.showToast({
+        type: "success",
+        title: "Correction Stored in Memory",
+        message: `YOLO learned '${res.original_class}' → '${res.corrected_class}'. Future similar detections will be corrected automatically.`
+      });
+
+      setTimeout(() => {
+        const modal = document.getElementById('feedbackModal');
+        if (modal) modal.style.display = 'none';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origBtnText;
+        }
+      }, 1200);
+
+    } catch (err) {
+      console.error("Feedback submission error:", err);
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusMsg.style.color = '#ef4444';
+        statusMsg.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusMsg.textContent = err.message || 'Failed to submit feedback.';
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origBtnText;
+      }
+    }
+  }
+
+  async submitInlineReviewComment() {
+    const selectEl = document.getElementById('reviewTargetSelect');
+    const commentBox = document.getElementById('reviewCommentBox');
+    const statusMsg = document.getElementById('reviewStatusMsg');
+    const submitBtn = document.getElementById('btnSubmitReviewComment');
+
+    const targetId = (selectEl && selectEl.value) || this.selectedTargetId;
+    if (!targetId) {
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg error';
+        statusMsg.textContent = 'Please select a target to review.';
+      }
+      return;
+    }
+
+    const comment = commentBox ? commentBox.value.trim() : '';
+    if (!comment) {
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg error';
+        statusMsg.textContent = 'Please enter natural-language feedback or click a quick tag.';
+      }
+      return;
+    }
+
+    const target = this.targets.find(t => String(t.object_id) === String(targetId));
+    if (!target) return;
+
+    const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+    }
+
+    try {
+      const analysisId = (this.currentAnalysisResult && this.currentAnalysisResult.analysis_id) || "latest";
+      const res = await window.apiService.submitFeedback(
+        analysisId,
+        target.object_id,
+        comment
+      );
+
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg success';
+        statusMsg.innerHTML = `<i class="fa-solid fa-circle-check"></i> <b>Learned:</b> Reclassified as <b>${res.corrected_class.replace(/_/g, ' ')}</b>. Saved to memory.`;
+      }
+
+      // Update local target record
+      target.original_model_class = res.original_class;
+      target.class = res.corrected_class;
+      target.class_id = res.corrected_class_id;
+      target.memory_corrected = true;
+      if (res.target && res.target.priority_level) {
+        target.priority_level = res.target.priority_level;
+        target.priority_label = res.target.priority_label;
+      }
+
+      if (commentBox) commentBox.value = '';
+
+      // Re-render target cards to reflect new class and memory badge
+      this.renderTargetList();
+      this.onTargetSelected(target.object_id, { fly: false, force: true });
+
+      this.showToast({
+        type: "success",
+        title: "Correction Stored in Memory",
+        message: `YOLO learned '${res.original_class}' → '${res.corrected_class}'. Future similar detections will be corrected automatically.`
+      });
+
+      setTimeout(() => {
+        if (statusMsg) statusMsg.style.display = 'none';
+      }, 5000);
+
+    } catch (err) {
+      console.error("Inline feedback error:", err);
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'review-status-msg error';
+        statusMsg.textContent = err.message || 'Failed to submit feedback.';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origBtnText;
+      }
+    }
   }
 }
 

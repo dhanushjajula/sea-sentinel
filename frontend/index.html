@@ -83,121 +83,166 @@
   <!-- 3-Column Dashboard Grid -->
   <main class="dashboard-grid">
 
-    <!-- Column 1: Survey Telemetry -->
-    <aside class="glass-panel telemetry-panel">
-      <div class="panel-header">
-        <span class="panel-title"><i class="fa-solid fa-chart-simple"></i> Survey Telemetry</span>
-        <span class="panel-tag cyan">DUAL-PATH FUSED</span>
+    <!-- Column 1: Survey Telemetry & Review System -->
+    <aside class="left-stage">
+
+      <!-- Sub-Panel 1: Survey Telemetry -->
+      <div class="glass-panel telemetry-panel">
+        <div class="panel-header">
+          <span class="panel-title"><i class="fa-solid fa-chart-simple"></i> Survey Telemetry</span>
+          <span class="panel-tag cyan">DUAL-PATH FUSED</span>
+        </div>
+
+        <!-- Accuracy Circular Radial Gauge -->
+        <div class="accuracy-gauge-wrap">
+          <div class="accuracy-gauge">
+            <svg viewBox="0 0 120 120" class="gauge-svg">
+              <circle cx="60" cy="60" r="48" class="gauge-bg"></circle>
+              <circle cx="60" cy="60" r="48" class="gauge-progress" id="accuracyGaugeCircle" style="stroke-dasharray: 301.6; stroke-dashoffset: 61.5;"></circle>
+            </svg>
+            <div class="gauge-inner">
+              <div class="gauge-val" id="telemetryAccuracyVal">98.7%</div>
+              <div class="gauge-sub">RECALL SCORE</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5-Tier Debris Risk & Priority Summary Banner -->
+        <div class="priority-summary-box">
+          <div class="priority-summary-header">
+            <span class="prio-box-title"><i class="fa-solid fa-triangle-exclamation"></i> Inspection Priority Matrix</span>
+            <span class="prio-box-tag">EXPLAINABLE RISK</span>
+          </div>
+          <div class="priority-summary-grid">
+            <div class="prio-cell total">
+              <span class="prio-num" id="kpiTotalDebris">0</span>
+              <span class="prio-lbl">TOTAL DEBRIS</span>
+            </div>
+            <div class="prio-cell crit">
+              <span class="prio-num" id="kpiCriticalCount">0</span>
+              <span class="prio-lbl">CRITICAL</span>
+            </div>
+            <div class="prio-cell high">
+              <span class="prio-num" id="kpiHighCount">0</span>
+              <span class="prio-lbl">HIGH</span>
+            </div>
+            <div class="prio-cell med">
+              <span class="prio-num" id="kpiMedCount">0</span>
+              <span class="prio-lbl">MEDIUM</span>
+            </div>
+            <div class="prio-cell low">
+              <span class="prio-num" id="kpiLowCount">0</span>
+              <span class="prio-lbl">LOW</span>
+            </div>
+          </div>
+          <!-- Highest Priority Debris Card Highlight -->
+          <div class="highest-priority-card" id="highestPriorityCard" style="display: none;">
+            <div class="hp-left">
+              <span class="hp-badge"><i class="fa-solid fa-bell"></i> HIGHEST PRIORITY</span>
+              <div class="hp-name" id="hpDebrisName">#D01 – Ghost Net</div>
+            </div>
+            <div class="hp-right">
+              <div class="hp-score" id="hpDebrisScore">91/100</div>
+              <div class="hp-level critical" id="hpDebrisLevel">CRITICAL</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2x2 Telemetry Metric Grid -->
+        <div class="telemetry-grid">
+          <div class="telemetry-cell">
+            <div class="cell-label">TOTAL TARGETS</div>
+            <div class="cell-val cyan" id="kpiTotal">0</div>
+          </div>
+          <div class="telemetry-cell">
+            <div class="cell-label">CONFIRMED DEBRIS</div>
+            <div class="cell-val green" id="kpiConfirmed">0</div>
+          </div>
+          <div class="telemetry-cell">
+            <div class="cell-label">SUSPICIOUS</div>
+            <div class="cell-val amber" id="kpiSuspicious">0</div>
+          </div>
+          <div class="telemetry-cell">
+            <div class="cell-label">HIGH HAZARD RISK</div>
+            <div class="cell-val red" id="kpiHighRisk">0</div>
+          </div>
+        </div>
+
+        <!-- Dual-Path Source Breakdown -->
+        <div class="fusion-breakdown-section">
+          <div class="export-title"><i class="fa-solid fa-code-merge"></i> Detection Provenance</div>
+          <div class="fusion-pills-row">
+            <div class="provenance-pill both" title="Agreed by both YOLO and U-Net">
+              <span class="prov-dot cyan"></span> BOTH: <b id="kpiBothCount">0</b>
+            </div>
+            <div class="provenance-pill yolo" title="Discovered by YOLO only">
+              <span class="prov-dot orange"></span> YOLO ONLY: <b id="kpiYoloOnlyCount">0</b>
+            </div>
+            <div class="provenance-pill unet" title="Discovered by U-Net only (Recovered YOLO Misses)">
+              <span class="prov-dot magenta"></span> U-NET ONLY: <b id="kpiUnetOnlyCount">0</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2x2 Model Indicators -->
+        <div class="model-status-grid">
+          <div class="model-pill" id="pillYolo"><span class="dot green"></span> YOLOv11 (Boxes)</div>
+          <div class="model-pill" id="pillUnet"><span class="dot green"></span> U-Net (Masks)</div>
+          <div class="model-pill" id="pillAuto"><span class="dot green"></span> Anomaly Verifier</div>
+          <div class="model-pill" id="pillGeo"><span class="dot green"></span> GeoEngine</div>
+        </div>
+
+        <!-- Export Survey Deliverables -->
+        <div class="export-section">
+          <div class="export-title">Export Survey Deliverables</div>
+          <button class="btn-export-outline" id="btnExportCSV">
+            <i class="fa-solid fa-file-csv"></i> Download CSV Report
+          </button>
+          <button class="btn-export-outline" id="btnOpenReport">
+            <i class="fa-solid fa-file-lines"></i> View HTML Report
+          </button>
+        </div>
       </div>
 
-      <!-- Accuracy Circular Radial Gauge -->
-      <div class="accuracy-gauge-wrap">
-        <div class="accuracy-gauge">
-          <svg viewBox="0 0 120 120" class="gauge-svg">
-            <circle cx="60" cy="60" r="48" class="gauge-bg"></circle>
-            <circle cx="60" cy="60" r="48" class="gauge-progress" id="accuracyGaugeCircle" style="stroke-dasharray: 301.6; stroke-dashoffset: 61.5;"></circle>
-          </svg>
-          <div class="gauge-inner">
-            <div class="gauge-val" id="telemetryAccuracyVal">98.7%</div>
-            <div class="gauge-sub">RECALL SCORE</div>
-          </div>
+      <!-- Sub-Panel 2: Review System & Feedback Comment Box -->
+      <div class="glass-panel review-panel" id="reviewSystemPanel">
+        <div class="panel-header">
+          <span class="panel-title"><i class="fa-solid fa-comment-dots"></i> Target Review System</span>
+          <span class="panel-tag cyan" id="reviewTargetBadge">HITL AI</span>
         </div>
-      </div>
+        <div class="review-body">
+          <div class="review-target-header">
+            <span class="review-target-label">TARGET:</span>
+            <select id="reviewTargetSelect" class="review-target-select" title="Select detected target to review">
+              <option value="">Awaiting targets...</option>
+            </select>
+          </div>
 
-      <!-- 5-Tier Debris Risk & Priority Summary Banner -->
-      <div class="priority-summary-box">
-        <div class="priority-summary-header">
-          <span class="prio-box-title"><i class="fa-solid fa-triangle-exclamation"></i> Inspection Priority Matrix</span>
-          <span class="prio-box-tag">EXPLAINABLE RISK</span>
-        </div>
-        <div class="priority-summary-grid">
-          <div class="prio-cell total">
-            <span class="prio-num" id="kpiTotalDebris">0</span>
-            <span class="prio-lbl">TOTAL DEBRIS</span>
+          <div class="review-comment-wrap">
+            <label for="reviewCommentBox" class="review-input-label">Natural Language Feedback / Correction:</label>
+            <textarea id="reviewCommentBox" class="review-textarea" rows="3" placeholder="Explain what this target is... e.g. 'This is actually a fishing net snagged on rocks, not engine debris' or 'False alarm caused by seabed ridge'"></textarea>
           </div>
-          <div class="prio-cell crit">
-            <span class="prio-num" id="kpiCriticalCount">0</span>
-            <span class="prio-lbl">CRITICAL</span>
-          </div>
-          <div class="prio-cell high">
-            <span class="prio-num" id="kpiHighCount">0</span>
-            <span class="prio-lbl">HIGH</span>
-          </div>
-          <div class="prio-cell med">
-            <span class="prio-num" id="kpiMedCount">0</span>
-            <span class="prio-lbl">MEDIUM</span>
-          </div>
-          <div class="prio-cell low">
-            <span class="prio-num" id="kpiLowCount">0</span>
-            <span class="prio-lbl">LOW</span>
-          </div>
-        </div>
-        <!-- Highest Priority Debris Card Highlight -->
-        <div class="highest-priority-card" id="highestPriorityCard" style="display: none;">
-          <div class="hp-left">
-            <span class="hp-badge"><i class="fa-solid fa-bell"></i> HIGHEST PRIORITY</span>
-            <div class="hp-name" id="hpDebrisName">#D01 – Ghost Net</div>
-          </div>
-          <div class="hp-right">
-            <div class="hp-score" id="hpDebrisScore">91/100</div>
-            <div class="hp-level critical" id="hpDebrisLevel">CRITICAL</div>
-          </div>
-        </div>
-      </div>
 
-      <!-- 2x2 Telemetry Metric Grid -->
-      <div class="telemetry-grid">
-        <div class="telemetry-cell">
-          <div class="cell-label">TOTAL TARGETS</div>
-          <div class="cell-val cyan" id="kpiTotal">0</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="cell-label">CONFIRMED DEBRIS</div>
-          <div class="cell-val green" id="kpiConfirmed">0</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="cell-label">SUSPICIOUS</div>
-          <div class="cell-val amber" id="kpiSuspicious">0</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="cell-label">HIGH HAZARD RISK</div>
-          <div class="cell-val red" id="kpiHighRisk">0</div>
-        </div>
-      </div>
+          <!-- Quick Correction Chips -->
+          <div class="review-quick-chips">
+            <span class="chip-hint-lbl">Quick Tags:</span>
+            <button type="button" class="quick-chip" data-text="This is actually a fishing net, not a pipeline or cable">Net</button>
+            <button type="button" class="quick-chip" data-text="This is actually a pipeline or subsea cable">Pipeline</button>
+            <button type="button" class="quick-chip" data-text="This is a shipwreck fragment or hull timber">Shipwreck</button>
+            <button type="button" class="quick-chip" data-text="This is metallic engine debris or motor part">Engine</button>
+            <button type="button" class="quick-chip" data-text="False alarm. Natural seabed rock clutter, not debris">False Alarm</button>
+          </div>
 
-      <!-- Dual-Path Source Breakdown -->
-      <div class="fusion-breakdown-section">
-        <div class="export-title"><i class="fa-solid fa-code-merge"></i> Detection Provenance</div>
-        <div class="fusion-pills-row">
-          <div class="provenance-pill both" title="Agreed by both YOLO and U-Net">
-            <span class="prov-dot cyan"></span> BOTH: <b id="kpiBothCount">0</b>
-          </div>
-          <div class="provenance-pill yolo" title="Discovered by YOLO only">
-            <span class="prov-dot orange"></span> YOLO ONLY: <b id="kpiYoloOnlyCount">0</b>
-          </div>
-          <div class="provenance-pill unet" title="Discovered by U-Net only (Recovered YOLO Misses)">
-            <span class="prov-dot magenta"></span> U-NET ONLY: <b id="kpiUnetOnlyCount">0</b>
+          <!-- Live Status Feedback Message -->
+          <div id="reviewStatusMsg" class="review-status-msg" style="display: none;"></div>
+
+          <!-- Submit Review Button -->
+          <div class="review-actions">
+            <button type="button" class="btn-review-submit" id="btnSubmitReviewComment">
+              <i class="fa-solid fa-paper-plane"></i> Submit Feedback
+            </button>
           </div>
         </div>
-      </div>
-
-      <!-- 2x2 Model Indicators -->
-      <div class="model-status-grid">
-        <div class="model-pill" id="pillYolo"><span class="dot green"></span> YOLOv11 (Boxes)</div>
-        <div class="model-pill" id="pillUnet"><span class="dot green"></span> U-Net (Masks)</div>
-        <div class="model-pill" id="pillAuto"><span class="dot green"></span> Anomaly Verifier</div>
-        <div class="model-pill" id="pillGeo"><span class="dot green"></span> GeoEngine</div>
-      </div>
-
-      <!-- Export Survey Deliverables -->
-      <div class="export-section">
-        <div class="export-title">Export Survey Deliverables</div>
-        <button class="btn-export-outline" id="btnExportCSV">
-          <i class="fa-solid fa-file-csv"></i> Download CSV Report
-        </button>
-        <button class="btn-export-outline" id="btnOpenReport">
-          <i class="fa-solid fa-file-lines"></i> View HTML Report
-        </button>
       </div>
     </aside>
 
@@ -220,11 +265,6 @@
             <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
             <div class="dropzone-main"><b>Upload Sonar Imagery or GeoTIFF Mosaic</b></div>
             <div class="dropzone-sub">Drag &amp; drop or <span class="browse-link">browse files</span></div>
-
-            <!-- Quick Benchmark Missions -->
-            <div class="quick-samples-bar" id="sampleChipsContainer">
-              <!-- Rendered dynamically by app.js -->
-            </div>
           </div>
 
           <!-- Complete / Active State -->
@@ -510,6 +550,48 @@
 
       <div class="modal-body" id="modalReportContent">
         <!-- Rendered dynamically by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       Target Human Feedback & Correction Modal
+       ========================================================= -->
+  <div class="modal-backdrop" id="feedbackModal" style="display: none;">
+    <div class="modal-card feedback-modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <div class="modal-subtitle">CONTINUOUS LEARNING &amp; CORRECTION MEMORY</div>
+          <h2 class="modal-title" style="font-size: 1.15rem;"><i class="fa-solid fa-comment-dots" style="color: var(--cyan-beam);"></i> Provide Feedback for Target</h2>
+        </div>
+        <div class="modal-header-actions">
+          <button class="modal-close" id="btnCloseFeedbackModal" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 20px;">
+        <div class="feedback-target-summary" id="feedbackTargetSummary" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-dark, #334155); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.85rem;">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div>
+          <label for="feedbackCommentInput" style="display: block; font-size: 0.82rem; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">
+            Explain what this target actually is (Natural Language):
+          </label>
+          <textarea id="feedbackCommentInput" rows="3" placeholder="e.g. 'This is actually a fishing net snagged on rocks, not a pipeline' or 'False alarm caused by seabed ridge'..." style="width: 100%; border-radius: 8px; border: 1px solid var(--border-dark, #334155); background: #0b1120; color: #f8fafc; padding: 12px; font-family: inherit; font-size: 0.88rem; resize: vertical; box-sizing: border-box; line-height: 1.4; outline: none;"></textarea>
+          <div style="font-size: 0.74rem; color: #64748b; margin-top: 5px;">
+            AI understands natural language explanations and updates Correction Memory to avoid repeating similar mistakes.
+          </div>
+        </div>
+
+        <div id="feedbackStatusMsg" style="margin-top: 12px; display: none; padding: 10px 14px; border-radius: 6px; font-size: 0.84rem;"></div>
+
+        <div style="margin-top: 18px; display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn-ghost" id="btnCancelFeedback" style="padding: 8px 16px; font-size: 0.85rem;">Cancel</button>
+          <button type="button" class="btn-primary" id="btnSubmitFeedback" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 600;">
+            <i class="fa-solid fa-paper-plane"></i> Submit Feedback
+          </button>
+        </div>
       </div>
     </div>
   </div>
