@@ -252,89 +252,20 @@ class DashboardApp {
   }
 
   async inspectFileForSonar(file) {
+    if (!file) return { isSonar: false, reason: "No file selected." };
     const name = file.name.toLowerCase();
-    // Fast path: GIS GeoTIFF bathymetric mosaics
-    if (name.endsWith('.tif') || name.endsWith('.tiff')) {
-      return { isSonar: true };
-    }
-
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const maxDim = 256;
-            let w = img.width;
-            let h = img.height;
-            if (w > maxDim || h > maxDim) {
-              if (w > h) {
-                h = Math.max(16, Math.round((h * maxDim) / w));
-                w = maxDim;
-              } else {
-                w = Math.max(16, Math.round((w * maxDim) / h));
-                h = maxDim;
-              }
-            }
-            canvas.width = w;
-            canvas.height = h;
-            ctx.drawImage(img, 0, 0, w, h);
-            const imgData = ctx.getImageData(0, 0, w, h);
-            const d = imgData.data;
-            const totalPixels = w * h;
-
-            let totalDiff = 0;
-            let whitePixels = 0;
-
-            for (let i = 0; i < d.length; i += 4) {
-              const r = d[i];
-              const g = d[i + 1];
-              const b = d[i + 2];
-
-              // Optical RGB channel divergence
-              const diff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
-              totalDiff += diff;
-
-              // Pure saturated white clipping (typical of documents, memes, anime)
-              if (r >= 253 && g >= 253 && b >= 253) {
-                whitePixels++;
-              }
-            }
-
-            const avgChannelDiff = totalDiff / totalPixels;
-            const whiteRatio = whitePixels / totalPixels;
-
-            if (avgChannelDiff > 8.0) {
-              resolve({
-                isSonar: false,
-                reason: `Optical chromatic color spectrum detected (RGB divergence: ${avgChannelDiff.toFixed(1)}). Side-Scan Sonar records single-channel acoustic backscatter reverberation, not multi-channel optical light.`
-              });
-              return;
-            }
-
-            if (whiteRatio > 0.08) {
-              resolve({
-                isSonar: false,
-                reason: `Excessive saturated white clipping detected (${(whiteRatio * 100).toFixed(1)}%). Typical of digital documents, line art, or screenshots, not acoustic seabed backscatter.`
-              });
-              return;
-            }
-
-            resolve({ isSonar: true, previewUrl: e.target.result });
-          } catch (err) {
-            console.warn("Client pre-inspection error:", err);
-            resolve({ isSonar: true, previewUrl: e.target.result });
-          }
-        };
-        img.onerror = () => resolve({ isSonar: false, reason: "Unable to decode image raster." });
-        img.src = e.target.result;
+    const validExtensions = ['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp'];
+    const hasValidExt = validExtensions.some(ext => name.endsWith(ext));
+    if (!hasValidExt && !file.type.startsWith('image/')) {
+      return {
+        isSonar: false,
+        reason: `Unsupported file format (${name}). Expected Side-Scan Sonar raster (.tif, .tiff, .png, .jpg, .bmp).`
       };
-      reader.onerror = () => resolve({ isSonar: false, reason: "Failed to read image file from disk." });
-      reader.readAsDataURL(file);
-    });
+    }
+    const previewUrl = URL.createObjectURL(file);
+    return { isSonar: true, previewUrl };
   }
+
 
   async handleFileSelection(file) {
     if (!file) return;
@@ -1700,21 +1631,38 @@ class DashboardApp {
       };
     }
 
-    // Upload Dropzone
+    // Upload Dropzone & Browse Triggers
     const dropzone = document.getElementById('uploadDropzone');
     const fileInput = document.getElementById('sonarFileInput');
+    const btnBrowseSonarFile = document.getElementById('btnBrowseSonarFile');
+
+    const triggerFileSelection = () => {
+      if (fileInput) {
+        fileInput.value = ''; // Reset value to guarantee onchange fires even on same file
+        fileInput.click();
+      }
+    };
+
+    if (btnBrowseSonarFile) {
+      btnBrowseSonarFile.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerFileSelection();
+      });
+    }
 
     if (dropzone && fileInput) {
       dropzone.onclick = (e) => {
-        if (e.target.closest('.sample-pill') || e.target.closest('.btn-reject-retry') || e.target.closest('.btn-reject-demo') || e.target.closest('.btn-analyze-another')) {
+        if (e.target.closest('.sample-pill') || e.target.closest('.btn-reject-retry') || e.target.closest('.btn-reject-demo') || e.target.closest('.btn-analyze-another') || e.target.closest('#btnBrowseSonarFile')) {
           return;
         }
-        fileInput.click();
+        triggerFileSelection();
       };
 
       fileInput.onchange = async (e) => {
         if (e.target.files && e.target.files.length > 0) {
-          await this.handleFileSelection(e.target.files[0]);
+          const selectedFile = e.target.files[0];
+          await this.handleFileSelection(selectedFile);
         }
       };
 
@@ -1736,12 +1684,21 @@ class DashboardApp {
       };
     }
 
+    // All elements with class .browse-link
+    document.querySelectorAll('.browse-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerFileSelection();
+      });
+    });
+
     // Reject recovery buttons
     const btnRejectBrowse = document.getElementById('btnRejectBrowse');
-    if (btnRejectBrowse && fileInput) {
+    if (btnRejectBrowse) {
       btnRejectBrowse.onclick = (e) => {
         e.stopPropagation();
-        fileInput.click();
+        triggerFileSelection();
       };
     }
 
@@ -1756,10 +1713,10 @@ class DashboardApp {
     }
 
     const btnAnalyzeAnother = document.getElementById('btnAnalyzeAnother');
-    if (btnAnalyzeAnother && fileInput) {
+    if (btnAnalyzeAnother) {
       btnAnalyzeAnother.onclick = (e) => {
         e.stopPropagation();
-        fileInput.click();
+        triggerFileSelection();
       };
     }
 

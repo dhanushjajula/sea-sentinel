@@ -118,79 +118,11 @@ class SonarPreprocessor:
                 "reason": "Minimum resolution required is 24x24."
             }
 
-        # 1. Color / Chromatic Saturation Check
-        # Side-scan sonar transducers measure acoustic backscatter intensity (single scalar energy).
-        # Genuine sonar images are single-channel grayscale or 1D false-color lookup tables.
-        # Natural optical photos, anime, cartoons, portraits have independent color channels & high saturation.
+        # Accept all decodable raster formats and inspect dimensions
         if img.ndim == 3 and img.shape[2] >= 3:
-            b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-            diff_rg = float(np.mean(np.abs(r.astype(float) - g.astype(float))))
-            diff_rb = float(np.mean(np.abs(r.astype(float) - b.astype(float))))
-            diff_gb = float(np.mean(np.abs(g.astype(float) - b.astype(float))))
-            max_diff = max(diff_rg, diff_rb, diff_gb)
-
-            hsv = cv2.cvtColor(img[:, :, :3], cv2.COLOR_BGR2HSV)
-            sat_mean = float(np.mean(hsv[:, :, 1])) / 255.0
-
-            if sat_mean > 0.12 or max_diff > 12.0:
-                return {
-                    "valid": False,
-                    "is_sonar": False,
-                    "error": "Invalid Input: The provided file is a standard optical photo or digital graphic, not a Side-Scan Sonar (SSS) acoustic image.",
-                    "reason": f"Optical color spectrum detected (Mean Saturation: {sat_mean*100:.1f}%, Channel Divergence: {max_diff:.1f}). Authentic Side-Scan Sonar records single-channel acoustic backscatter reverberation, not multi-channel chromatic optical color.",
-                    "details": {
-                        "saturation_pct": round(sat_mean * 100, 1),
-                        "max_channel_diff": round(max_diff, 1)
-                    }
-                }
             gray = cv2.cvtColor(img[:, :, :3], cv2.COLOR_BGR2GRAY)
         else:
             gray = img if img.ndim == 2 else img[:, :, 0]
-
-        # Downsample for fast, stable statistical analysis
-        scale = min(1.0, 512.0 / max(h, w))
-        if scale < 1.0:
-            eval_gray = cv2.resize(gray, (max(32, int(w * scale)), max(32, int(h * scale))), interpolation=cv2.INTER_AREA)
-        else:
-            eval_gray = gray
-
-        # 2. Extreme Pixel Clipping Check
-        # Anime, manga, line art, invoices, documents, and UI graphics have huge pure white (254-255) backgrounds.
-        # Real sonar backscatter rarely exceeds 1% pure saturated white across the seafloor.
-        clip_255_ratio = float(np.mean(eval_gray >= 254))
-        if clip_255_ratio > 0.06:
-            return {
-                "valid": False,
-                "is_sonar": False,
-                "error": "Invalid Input: Excessive saturated white clipping detected. This file is not an acoustic Side-Scan Sonar scan.",
-                "reason": f"High saturated white clipping ({clip_255_ratio*100:.1f}% pure white pixels). Typical of digital art, anime line drawings, documents, or screenshots, not acoustic seabed backscatter.",
-                "details": {
-                    "clip_255_ratio": round(clip_255_ratio, 4)
-                }
-            }
-
-        # 3. Acoustic Texture & Speckle Noise Analysis
-        # Active acoustic sonar creates pervasive coherent speckle noise (Rayleigh / Gamma distribution) across the benthic floor.
-        # Digital graphics, vector art, smooth portraits, and cartoon fills have large regions of perfectly flat/zero-variance pixels.
-        # Note: In sonar, acoustic shadow and nadir water column can be dark (pixel < 20).
-        # We evaluate flat variance on non-shadow illuminated seabed (20 < pixel < 235), plus total image flatness.
-        blur_sq = cv2.blur(eval_gray.astype(float)**2, (9, 9))
-        sq_blur = cv2.blur(eval_gray.astype(float), (9, 9))**2
-        local_std = np.sqrt(np.maximum(0.0, blur_sq - sq_blur))
-        flat_non_shadow = float(np.mean((local_std < 3.0) & (eval_gray > 20) & (eval_gray < 235)))
-        flat_all = float(np.mean(local_std < 3.0))
-
-        if flat_non_shadow > 0.06 or flat_all > 0.35:
-            return {
-                "valid": False,
-                "is_sonar": False,
-                "error": "Invalid Input: Smooth / non-acoustic texture detected. The provided file lacks acoustic speckle noise and seabed texture.",
-                "reason": f"Non-acoustic texture detected (Midtone flat ratio: {flat_non_shadow*100:.1f}%, Total flat: {flat_all*100:.1f}%). Authentic Side-Scan Sonar imagery exhibits pervasive acoustic speckle noise across the illuminated seafloor.",
-                "details": {
-                    "flat_non_shadow_ratio": round(flat_non_shadow, 4),
-                    "flat_all_ratio": round(flat_all, 4)
-                }
-            }
 
         return {
             "valid": True,

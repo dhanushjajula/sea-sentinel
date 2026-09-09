@@ -658,7 +658,33 @@ body {
   color: var(--cyan-beam);
   text-decoration: underline;
   font-weight: 600;
+  cursor: pointer;
 }
+
+.btn-browse-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  color: var(--cyan-beam);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-top: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-browse-trigger:hover {
+  background: rgba(0, 229, 255, 0.28);
+  border-color: var(--cyan-beam);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+  transform: translateY(-1px);
+}
+
 
 /* Quick Benchmark Missions bar */
 .quick-samples-bar {
