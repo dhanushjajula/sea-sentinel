@@ -46,6 +46,13 @@ from inference.fusion_engine import FusionEngine
 from inference.verifier import CandidateVerifier
 from inference.multiframe import MultiFrameTracker
 from evaluation.ablation_evaluator import AblationEvaluator
+from shared.hardware import HardwareDetector, PipelineProfiler, warmup_ai_models
+
+from ai.geospatial.local_gis import LocalGISEngine
+from database.local_db import LocalDatabase
+from database.sync_manager import SyncManager
+from ai.model_manager import ModelManager
+from ai.analytics.change_detector import SurveyChangeDetector
 
 
 class SIHPipelineAgent:
@@ -163,6 +170,13 @@ class SIHPipelineAgent:
         self.audit_logger = SurveyAuditLogger()
         self._bg_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="sea_sentinel_bg")
 
+        # Edge-First, Offline-Native Engines
+        self.local_gis = LocalGISEngine()
+        self.local_db = LocalDatabase()
+        self.sync_manager = SyncManager(local_db=self.local_db)
+        self.change_detector = SurveyChangeDetector(match_radius_m=35.0)
+        self.model_manager = ModelManager(agent_instance=self)
+
         # Continuous Learning & Human Feedback Engines
         self.correction_memory = CorrectionMemory()
         self.nlu_engine = FeedbackNLUEngine()
@@ -170,6 +184,13 @@ class SIHPipelineAgent:
         self.learner = YOLOLearner(
             on_model_deployed=self.hot_reload_yolo_model
         )
+
+        # Hardware-Aware Acceleration & Warmup
+        self.hardware_profile = HardwareDetector.get_hardware_profile()
+        try:
+            warmup_ai_models(self)
+        except Exception:
+            pass
 
     def hot_reload_yolo_model(self, new_checkpoint_path: str):
         """Hot-reloads the YOLO detector with newly fine-tuned weights without restarting the server."""
@@ -182,22 +203,28 @@ class SIHPipelineAgent:
         image_path: str,
         raster_meta_override: Optional[Dict[str, Any]] = None,
         nav_log: Optional[Dict[str, Any]] = None,
-        frame_idx: int = 1
+        frame_idx: int = 1,
+        mode: str = "balanced"
     ) -> Dict[str, Any]:
         """
         Executes end-to-end coordinated parallel YOLO + U-Net pipeline with fusion,
         verification, geotagging, explainability, and full audit logging.
+        Modes:
+          - 'fast': Single-pass direct inference, lowest latency (<10s target).
+          - 'balanced': Default production mode, standard adaptive tiling (<15-20s).
+          - 'high_accuracy': Multi-scale / dense overlap candidate proposals.
         """
         start_time = time.perf_counter()
         analysis_id = f"SURVEY_{str(uuid.uuid4())[:8].upper()}"
         execution_trace = []
+        profiler = PipelineProfiler(target_seconds=20.0)
 
         # -------------------------------------------------------------
         # Stage 1: Input Validation
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
+        profiler.start_stage("input_validation")
         val_res = self.preprocessor.validate_image(image_path)
-        t_val = round((time.perf_counter() - t0) * 1000, 2)
+        t_val = profiler.end_stage("input_validation")
 
         if not val_res.get("valid"):
             err_msg = val_res.get("error", "Input validation failed.")
@@ -215,7 +242,8 @@ class SIHPipelineAgent:
                 "is_sonar": False,
                 "error": err_msg,
                 "details": val_res.get("details", {}),
-                "execution_trace": execution_trace
+                "execution_trace": execution_trace,
+                "profiling": profiler.get_summary(mode=mode)
             }
 
         execution_trace.append({
@@ -226,15 +254,17 @@ class SIHPipelineAgent:
         })
 
         # Load raw image safely via preprocessor
+        profiler.start_stage("input_loading")
         raw_img, img_meta = self.preprocessor.load_image_as_grayscale(image_path)
         h_raw, w_raw = raw_img.shape[:2]
+        profiler.end_stage("input_loading")
 
         # -------------------------------------------------------------
         # Stage 2: Sonar Preprocessing (Lee filter, CLAHE, Normalization)
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
+        profiler.start_stage("preprocessing")
         prep_res = self.preprocessor.preprocess(raw_img)
-        t_prep = round((time.perf_counter() - t0) * 1000, 2)
+        t_prep = profiler.end_stage("preprocessing")
         preprocessed_img = prep_res.get("preprocessed_image", raw_img)
         
         execution_trace.append({
@@ -247,14 +277,17 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         # Stage 3: Concurrent Parallel YOLO + U-Net Inference
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
-        parallel_out = self.parallel_engine.run_parallel_inference(preprocessed_img)
-        t_parallel = round((time.perf_counter() - t0) * 1000, 2)
+        profiler.start_stage("parallel_inference")
+        parallel_out = self.parallel_engine.run_parallel_inference(preprocessed_img, mode=mode)
+        t_parallel = profiler.end_stage("parallel_inference")
 
         yolo_res = parallel_out.get("yolo", {})
         unet_res = parallel_out.get("unet", {})
         raw_yolo_dets = yolo_res.get("detections", [])
         raw_unet_objs = unet_res.get("objects", [])
+
+        profiler.record_stage("yolo_inference", float(yolo_res.get("inference_time_ms", 0.0)))
+        profiler.record_stage("unet_inference", float(unet_res.get("inference_time_ms", 0.0)))
 
         execution_trace.append({
             "stage": "parallel_inference",
@@ -592,12 +625,18 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         # Stage 4: Geological Rock Cluster Filtering (DBSCAN)
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
-        clustered_yolo = self.rock_filter.filter_detections(raw_yolo_dets)
-        clustered_unet = self.rock_filter.filter_detections(raw_unet_objs)
-        t_rock = round((time.perf_counter() - t0) * 1000, 2)
+        profiler.start_stage("rock_cluster_filtering")
+        if mode == "fast":
+            clustered_yolo = raw_yolo_dets
+            clustered_unet = raw_unet_objs
+            rock_clusters_count = 0
+            t_rock = 0.0
+        else:
+            clustered_yolo = self.rock_filter.filter_detections(raw_yolo_dets)
+            clustered_unet = self.rock_filter.filter_detections(raw_unet_objs)
+            rock_clusters_count = sum(1 for d in clustered_yolo if d.get("is_rock_cluster")) + sum(1 for d in clustered_unet if d.get("is_rock_cluster"))
+            t_rock = profiler.end_stage("rock_cluster_filtering")
 
-        rock_clusters_count = sum(1 for d in clustered_yolo if d.get("is_rock_cluster")) + sum(1 for d in clustered_unet if d.get("is_rock_cluster"))
         execution_trace.append({
             "stage": "rock_cluster_filtering",
             "status": "completed",
@@ -608,14 +647,14 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         # Stage 5: Candidate Fusion Engine (Dual-Model Association)
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
+        profiler.start_stage("candidate_fusion")
         fusion_out = self.fusion_engine.fuse(
             yolo_candidates=clustered_yolo,
             unet_candidates=clustered_unet,
             image_shape=(h_raw, w_raw)
         )
         fused_candidates = fusion_out.get("objects", [])
-        t_fusion = round((time.perf_counter() - t0) * 1000, 2)
+        t_fusion = profiler.end_stage("candidate_fusion")
 
         execution_trace.append({
             "stage": "candidate_fusion",
@@ -630,12 +669,12 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         # Stage 6: Candidate Verification (Acoustic Quality & Shadow)
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
+        profiler.start_stage("candidate_verification")
         verified_candidates = self.verifier.verify_candidates(
             candidates=fused_candidates,
             image=raw_img
         )
-        t_verify = round((time.perf_counter() - t0) * 1000, 2)
+        t_verify = profiler.end_stage("candidate_verification")
 
         execution_trace.append({
             "stage": "candidate_verification",
@@ -647,12 +686,12 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         # Stage 7: Multi-Frame Temporal/Spatial Tracking
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
+        profiler.start_stage("multiframe_tracking")
         tracked_candidates = self.multiframe_tracker.update_frame(
             frame_idx=frame_idx,
             candidates=verified_candidates
         )
-        t_track = round((time.perf_counter() - t0) * 1000, 2)
+        t_track = profiler.end_stage("multiframe_tracking")
 
         execution_trace.append({
             "stage": "multiframe_tracking",
@@ -664,11 +703,11 @@ class SIHPipelineAgent:
         # -------------------------------------------------------------
         # Stage 8: Raster Metadata & Georeferencing Check (Module 5)
         # -------------------------------------------------------------
-        t0 = time.perf_counter()
+        profiler.start_stage("georeference_check")
         raster_meta = raster_meta_override or self.geotagger.read_raster_metadata(image_path)
         active_nav_log = nav_log or raster_meta.get("nav_log")
         georef_case = self.geotagger.classify_georef_case(raster_meta, nav_log=active_nav_log)
-        t_geo = round((time.perf_counter() - t0) * 1000, 2)
+        t_geo = profiler.end_stage("georeference_check")
 
         execution_trace.append({
             "stage": "georeference_check",
@@ -901,12 +940,47 @@ class SIHPipelineAgent:
                 "height": h_raw
             }
 
+            # Local GIS Ecological & Infrastructure Risk Evaluation
+            gis_res = self.local_gis.evaluate_target_risk(
+                lat=lat,
+                lon=lon,
+                target_class=det.get("class", "debris"),
+                confidence=rp_scores["detection_confidence"],
+                length_m=dims.get("length_m", 1.0),
+                width_m=dims.get("width_m", 1.0)
+            )
+            rec["habitat_overlaps"] = gis_res.get("habitat_overlaps", [])
+            rec["nearest_infrastructure_m"] = gis_res.get("nearest_infrastructure_m")
+            rec["ecological_risk_category"] = gis_res.get("risk_category", "MODERATE")
+            rec["gis_risk_summary"] = gis_res.get("hazard_summary")
+
             final_objects.append(rec)
+
+        # -------------------------------------------------------------
+        # Stage 9.5: Repeat Survey Change Detection & Drift Prediction
+        # -------------------------------------------------------------
+        profiler.start_stage("change_detection")
+        hist_targets = self.local_db.get_all_georeferenced_targets() if hasattr(self, "local_db") else []
+        change_res = self.change_detector.compare_surveys(
+            current_targets=final_objects,
+            historical_targets=hist_targets[:50] if hist_targets else None,
+            time_delta_days=14.0
+        )
+        t_change = profiler.end_stage("change_detection")
+
+        execution_trace.append({
+            "stage": "change_detection",
+            "status": "completed",
+            "duration_ms": t_change,
+            "change_status": change_res.get("status"),
+            "new_objects": change_res.get("change_summary", {}).get("new_objects", 0),
+            "persistent_objects": change_res.get("change_summary", {}).get("persistent_objects", 0)
+        })
 
         # -------------------------------------------------------------
         # Stage 10: Preview Canvas Generation & Asynchronous Audit Logging
         # -------------------------------------------------------------
-        t0_vis = time.perf_counter()
+        profiler.start_stage("visualization")
         
         # Save Preview Rasters
         output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs", "preprocessed")
@@ -987,7 +1061,7 @@ class SIHPipelineAgent:
 
             cv2.imwrite(annotated_path, annotated_canvas)
 
-        t_vis = round((time.perf_counter() - t0_vis) * 1000, 2)
+        t_vis = profiler.end_stage("visualization")
         total_duration = round((time.perf_counter() - start_time) * 1000, 2)
 
         # Asynchronous SQLite Logging to prevent disk I/O blocking response
@@ -1056,7 +1130,8 @@ class SIHPipelineAgent:
             "georeferenced_targets": sum(1 for d in final_objects if d.get("latitude") is not None)
         }
 
-        profiling_metrics = {
+        profiling_metrics = profiler.get_summary(mode=mode)
+        profiling_metrics["legacy_breakdown"] = {
             "input_validation_ms": t_val,
             "preprocessing_ms": t_prep,
             "parallel_inference_ms": t_parallel,
@@ -1127,9 +1202,32 @@ class SIHPipelineAgent:
             "candidate_classes_breakdown": best_obj.get("all_detected_classes", []) if best_obj else []
         }
 
+        # Edge Local SQLite Database & Sync Queue Insertion
+        db_survey_id = analysis_id
+        try:
+            db_survey_id = self.local_db.insert_survey(
+                survey_data={
+                    "survey_id": analysis_id,
+                    "image_id": analysis_id,
+                    "image_name": os.path.basename(image_path),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "processing_mode": mode,
+                    "hardware": self.hardware_profile.get("backend", "CPU_EDGE"),
+                    "latency_ms": total_duration,
+                    "total_objects": len(final_objects)
+                },
+                detections=final_objects
+            )
+        except Exception:
+            pass
+
+        sync_status_summary = self.sync_manager.get_sync_status() if hasattr(self, "sync_manager") else {}
+
         return {
             "analysis_id": analysis_id,
+            "survey_id": db_survey_id,
             "status": "success",
+            "mode": mode,
             "image_path": image_path,
             "raw_image_path": raw_path if os.path.exists(raw_path) else None,
             "enhanced_image_path": enhanced_path if os.path.exists(enhanced_path) else None,
@@ -1160,6 +1258,8 @@ class SIHPipelineAgent:
                 "unet_only": unet_c,
                 "fusion_time_ms": t_fusion
             },
+            "change_detection": change_res,
+            "sync": sync_status_summary,
             "summary_statistics": stats,
             "priority_summary": stats,
             "highest_priority_debris": stats.get("highest_priority_debris"),
@@ -1172,7 +1272,7 @@ class SIHPipelineAgent:
             "yolo_model_loaded": self.detector.is_model_loaded,
             "unet_model_loaded": self.segmenter.is_model_loaded,
             "autoencoder_model_loaded": self.anomaly_detector.is_model_loaded,
-            "audit_database": self.audit_logger.db_path
+            "audit_database": self.local_db.db_path if hasattr(self, "local_db") else self.audit_logger.db_path
         }
 
     def _calculate_risk(self, debris_class: Optional[str], area_sq_m: Optional[float], confidence: float) -> str:

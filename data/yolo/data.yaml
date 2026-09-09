@@ -1,0 +1,12 @@
+# YOLOv11 Sonar Debris Detection Dataset
+path: .
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: fishing_net
+  1: pipeline_or_cable
+  2: shipwreck_fragment
+  3: engine_debris
+  4: riprap_debris

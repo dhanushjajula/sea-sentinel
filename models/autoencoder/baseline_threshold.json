@@ -1,0 +1,30 @@
+{
+  "model_checkpoint": "C:\\Users\\santo\\Desktop\\sih\\sea-sentinel\\backend\\models\\checkpoints\\autoencoder\\baseline_autoencoder.pt",
+  "threshold_3sigma": 0.106143,
+  "normal_seabed_mu": 0.072303,
+  "normal_seabed_sigma": 0.01128,
+  "training_samples": 22,
+  "validation_samples": 10,
+  "latent_dim": 128,
+  "patch_size": [
+    128,
+    128
+  ],
+  "history": [
+    {
+      "epoch": 1,
+      "train_mse": 0.126386,
+      "val_mse": 0.072384
+    },
+    {
+      "epoch": 2,
+      "train_mse": 0.113635,
+      "val_mse": 0.072324
+    },
+    {
+      "epoch": 3,
+      "train_mse": 0.101916,
+      "val_mse": 0.072303
+    }
+  ]
+}

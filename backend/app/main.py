@@ -90,6 +90,7 @@ class AnalyzeRequest(BaseModel):
     raster_meta: Optional[Dict[str, Any]] = None
     nav_log: Optional[Dict[str, Any]] = None
     frame_idx: Optional[int] = 1
+    mode: Optional[str] = "balanced"
 
 class YoloInferRequest(BaseModel):
     image_path: str
@@ -416,7 +417,8 @@ def analyze_survey(req: AnalyzeRequest):
         image_path=req.image_path,
         raster_meta_override=req.raster_meta,
         nav_log=req.nav_log,
-        frame_idx=req.frame_idx or 1
+        frame_idx=req.frame_idx or 1,
+        mode=req.mode or "balanced"
     )
 
     if res.get("status") == "rejected":
@@ -829,6 +831,81 @@ def trigger_fine_tuning(req: Optional[TrainRequest] = None):
 def get_learner_status():
     """Checks continuous training and model hot-reload status."""
     return agent.learner.get_status()
+
+
+# -----------------------------------------------------------------
+# Edge-First & Offline-Native Endpoints (GIS, Sync, Model Management)
+# -----------------------------------------------------------------
+@app.get("/api/gis/layers")
+def get_local_gis_layers():
+    """Returns local marine GIS layers (MPAs, coral reefs, seagrass, cables) as GeoJSON."""
+    return agent.local_gis.get_all_layers_geojson()
+
+
+@app.get("/api/sync/status")
+def get_sync_status():
+    """Returns store-and-forward cloud sync queue status and connectivity mode."""
+    return agent.sync_manager.get_sync_status()
+
+
+@app.post("/api/sync/trigger")
+def trigger_cloud_sync():
+    """Triggers batch upload of all pending local surveys to cloud storage."""
+    return agent.sync_manager.trigger_batch_sync()
+
+
+class SyncModeRequest(BaseModel):
+    mode: str
+
+
+@app.post("/api/sync/mode")
+def set_sync_mode(req: SyncModeRequest):
+    """Sets local connectivity mode: 'OFFLINE', 'ONLINE', or 'SYNCHRONIZING'."""
+    new_mode = agent.sync_manager.set_connection_mode(req.mode)
+    return {"status": "success", "connection_mode": new_mode}
+
+
+@app.get("/api/models/status")
+def get_edge_models_status():
+    """Returns cryptographic checksums, architecture, and status of edge AI models."""
+    return agent.model_manager.get_models_status()
+
+
+class ModelUpdateRequest(BaseModel):
+    model_type: str
+    weights_path: str
+    checksum_sha256: Optional[str] = None
+    version: Optional[str] = "vNext"
+
+
+@app.post("/api/models/update")
+def update_edge_model(req: ModelUpdateRequest):
+    """Verifies checksum, runs forward-pass smoke test, and hot-deploys updated model weights."""
+    return agent.model_manager.apply_model_update(
+        model_type=req.model_type,
+        new_weights_path=req.weights_path,
+        expected_sha256=req.checksum_sha256,
+        new_version=req.version or "vNext"
+    )
+
+
+class ModelRollbackRequest(BaseModel):
+    model_type: str
+
+
+@app.post("/api/models/rollback")
+def rollback_edge_model(req: ModelRollbackRequest):
+    """Rolls back the specified edge AI model to the previous working verified checkpoint."""
+    return agent.model_manager.rollback_model(model_type=req.model_type)
+
+
+@app.get("/api/surveys/history")
+def get_historical_surveys(limit: int = Query(50, ge=1, le=200)):
+    """Returns list of recent acoustic surveys stored in local SQLite database."""
+    return {
+        "status": "success",
+        "surveys": agent.local_db.get_recent_surveys(limit=limit)
+    }
 
 
 @app.get("/api/report/{analysis_id}")
