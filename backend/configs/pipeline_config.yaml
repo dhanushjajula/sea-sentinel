@@ -19,14 +19,14 @@ performance:
   enable_coarse_screening: true
 
 yolo:
-  model_path: "backend/models/checkpoints/sih57_yolo_run/weights/best.pt"
+  model_path: "models/yolo/best.pt"
   conf_threshold: 0.25 # High-recall threshold (avoids premature dropping of valid targets)
   iou_threshold: 0.45
   max_detections: 50
   img_size: 640
 
 unet:
-  checkpoint_path: "backend/models/checkpoints/unet/attention_unet_best.pt"
+  checkpoint_path: "models/unet/attention_unet_best.pt"
   model_type: "attention_unet" # "attention_unet" or "standard_unet"
   patch_size: 256
   stride: 192 # 75% step / 25% overlap
@@ -65,7 +65,7 @@ verification:
     shadow_relief: 0.25
     morphology_compactness: 0.20
     model_confidence: 0.30
-  autoencoder_checkpoint: "backend/models/checkpoints/autoencoder/baseline_autoencoder.pt"
+  autoencoder_checkpoint: "models/autoencoder/baseline_autoencoder.pt"
   rock_cluster_eps: 70.0
   rock_cluster_min_samples: 4
 

@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <!-- Custom Design System -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3.0">
 </head>
 <body>
 
@@ -183,15 +183,15 @@
 
         <!-- Dual-Path Source Breakdown -->
         <div class="fusion-breakdown-section">
-          <div class="export-title"><i class="fa-solid fa-code-merge"></i> Detection Provenance</div>
+          <div class="export-title"><i class="fa-solid fa-code-merge"></i> Detection Provenance (Dual-Path)</div>
           <div class="fusion-pills-row">
-            <div class="provenance-pill both" title="Agreed by both YOLO and U-Net">
-              <span class="prov-dot cyan"></span> BOTH: <b id="kpiBothCount">0</b>
+            <div class="provenance-pill both" title="Agreed simultaneously by both YOLOv11 (Boxes) and Attention U-Net (Masks)">
+              <span class="prov-dot cyan"></span> BOTH (YOLO+U-NET): <b id="kpiBothCount">0</b>
             </div>
-            <div class="provenance-pill yolo" title="Discovered by YOLO only">
+            <div class="provenance-pill yolo" title="Discovered by YOLOv11 only">
               <span class="prov-dot orange"></span> YOLO ONLY: <b id="kpiYoloOnlyCount">0</b>
             </div>
-            <div class="provenance-pill unet" title="Discovered by U-Net only (Recovered YOLO Misses)">
+            <div class="provenance-pill unet" title="Discovered by Attention U-Net only (Recovered YOLO Misses)">
               <span class="prov-dot magenta"></span> U-NET ONLY: <b id="kpiUnetOnlyCount">0</b>
             </div>
           </div>
@@ -1049,10 +1049,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Application Scripts -->
-  <script src="js/api.js"></script>
-  <script src="js/waterfall.js"></script>
-  <script src="js/map.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/api.js?v=3.0"></script>
+  <script src="js/waterfall.js?v=3.0"></script>
+  <script src="js/map.js?v=3.0"></script>
+  <script src="js/app.js?v=3.0"></script>
 
 </body>
 </html>

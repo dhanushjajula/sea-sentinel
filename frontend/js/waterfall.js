@@ -224,7 +224,17 @@ class WaterfallViewer {
   }
 
   _getTargetCanvasCoords(t, w, h) {
-    // 1. If normalized polygon exists, derive bounding box directly to ensure 100% perfect tight framing around U-Net segmentation
+    // 1. Primary: Use verified normalized bounding box
+    const norm = t.norm_bbox;
+    if (norm && (norm.x2 > norm.x1)) {
+      const x1 = Math.max(0, norm.x1 * w);
+      const y1 = Math.max(0, norm.y1 * h);
+      const x2 = Math.min(w, norm.x2 * w);
+      const y2 = Math.min(h, norm.y2 * h);
+      return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
+    }
+
+    // 2. Secondary: If normalized polygon exists, derive bounding box from polygon extents
     if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
       let minX = 1.0, minY = 1.0, maxX = 0.0, maxY = 0.0;
       t.norm_polygon.forEach(pt => {
@@ -234,23 +244,14 @@ class WaterfallViewer {
         if (pt[1] > maxY) maxY = pt[1];
       });
       if (maxX > minX && maxY > minY) {
-        const padX = 10 / w;
-        const padY = 10 / h;
+        const padX = 8 / w;
+        const padY = 8 / h;
         const x1 = Math.max(0, (minX - padX) * w);
         const y1 = Math.max(0, (minY - padY) * h);
         const x2 = Math.min(w, (maxX + padX) * w);
         const y2 = Math.min(h, (maxY + padY) * h);
         return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
       }
-    }
-
-    const norm = t.norm_bbox;
-    if (norm && (norm.x2 > norm.x1)) {
-      const x1 = norm.x1 * w;
-      const y1 = norm.y1 * h;
-      const x2 = norm.x2 * w;
-      const y2 = norm.y2 * h;
-      return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
     }
     const bbox = t.pixel_bbox || t.bbox || {};
     const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
@@ -408,7 +409,8 @@ class WaterfallViewer {
         // (B) Magenta Label Pill Badge (matching reference image "Normal" / Class tag)
         const confPct = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
         const cleanClass = (t.class || "debris").replace(/_/g, " ").toUpperCase();
-        const badgeText = `${cleanClass} ${confPct}%`;
+        const provBadge = srcCategory === "BOTH" ? " [YOLO+U-NET]" : (srcCategory === "UNET_ONLY" ? " [U-NET]" : " [YOLO]");
+        const badgeText = `${cleanClass} ${confPct}%${provBadge}`;
 
         ctx.font = "bold 11px 'JetBrains Mono', monospace";
         const tagW = ctx.measureText(badgeText).width + 16;

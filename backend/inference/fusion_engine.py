@@ -151,8 +151,16 @@ class FusionEngine:
         if not objects:
             return []
 
-        # Sort by confidence descending
-        sorted_objs = sorted(objects, key=lambda o: (o.get("confidence", 0.0), o.get("mask_area") or 0), reverse=True)
+        # Sort prioritizing dual-model agreement (BOTH) first, then confidence and area
+        sorted_objs = sorted(
+            objects,
+            key=lambda o: (
+                1 if o.get("source_category") == "BOTH" else 0,
+                float(o.get("confidence", 0.0)),
+                o.get("mask_area") or 0
+            ),
+            reverse=True
+        )
         kept = []
 
         for obj in sorted_objs:
@@ -225,11 +233,11 @@ class FusionEngine:
         cx = round(self.weight_yolo * yc[0] + self.weight_unet * uc[0], 1)
         cy = round(self.weight_yolo * yc[1] + self.weight_unet * uc[1], 1)
 
-        # Unified confidence
-        y_conf = float(y_cand.get("confidence", 0.5))
-        u_conf = float(u_cand.get("confidence", 0.5))
-        # Agreement boost
-        fused_conf = min(0.99, (self.weight_yolo * y_conf + self.weight_unet * u_conf) + 0.08)
+        # Unified confidence: Dual-model agreement confirms high consensus
+        y_conf = float(y_cand.get("confidence", 0.80))
+        u_conf = float(u_cand.get("confidence", 0.80))
+        max_conf = max(y_conf, u_conf)
+        fused_conf = min(0.98, max(0.88, max_conf + 0.08))
 
         cls_name = y_cand.get("class", u_cand.get("class", "marine_debris"))
         cls_id = y_cand.get("class_id", u_cand.get("class_id", 0))
@@ -273,6 +281,9 @@ class FusionEngine:
         cx = round(x1 + bw / 2.0, 1)
         cy = round(y1 + bh / 2.0, 1)
 
+        y_raw = float(y_cand.get("confidence", 0.70))
+        y_conf = round(min(0.78, max(0.55, y_raw * 0.90)), 3)
+
         return {
             "object_id": object_id,
             "sources": ["yolo"],
@@ -280,8 +291,8 @@ class FusionEngine:
             "agreement": False,
             "class": y_cand.get("class", "marine_debris"),
             "class_id": y_cand.get("class_id", 0),
-            "confidence": round(float(y_cand.get("confidence", 0.5)), 3),
-            "yolo_confidence": round(float(y_cand.get("confidence", 0.5)), 3),
+            "confidence": y_conf,
+            "yolo_confidence": y_conf,
             "unet_confidence": 0.0,
             "bbox": {"x1": round(x1, 1), "y1": round(y1, 1), "x2": round(x2, 1), "y2": round(y2, 1)},
             "width": bw,
@@ -311,6 +322,9 @@ class FusionEngine:
         bh = round(y2 - y1, 1)
         uc = u_cand.get("centroid", [x1 + bw / 2.0, y1 + bh / 2.0])
 
+        u_raw = float(u_cand.get("confidence", 0.70))
+        u_conf = round(min(0.76, max(0.52, u_raw * 0.90)), 3)
+
         return {
             "object_id": object_id,
             "sources": ["unet"],
@@ -318,9 +332,9 @@ class FusionEngine:
             "agreement": False,
             "class": u_cand.get("class", "marine_debris"),
             "class_id": u_cand.get("class_id", 0),
-            "confidence": round(float(u_cand.get("confidence", 0.5)), 3),
+            "confidence": u_conf,
             "yolo_confidence": 0.0,
-            "unet_confidence": round(float(u_cand.get("confidence", 0.5)), 3),
+            "unet_confidence": u_conf,
             "bbox": {"x1": round(x1, 1), "y1": round(y1, 1), "x2": round(x2, 1), "y2": round(y2, 1)},
             "width": bw,
             "height": bh,

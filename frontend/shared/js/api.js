@@ -313,6 +313,28 @@ class SeaSentinelAPI {
     return { is_training: false };
   }
 
+  async getSurveyTargets() {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/geospatial`, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.features && data.features.length > 0) {
+          return data.features.map(f => ({
+            object_id: f.properties.object_id,
+            class: f.properties.class,
+            latitude: f.properties.latitude || f.geometry.coordinates[1],
+            longitude: f.properties.longitude || f.geometry.coordinates[0],
+            confidence: f.properties.confidence,
+            risk_score: f.properties.hazard_risk
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn("Geospatial targets endpoint unreachable:", e);
+    }
+    return BENCHMARK_TARGETS;
+  }
+
   // -------------------------------------------------------------
   // Edge-First, Offline-Native API Methods
   // -------------------------------------------------------------

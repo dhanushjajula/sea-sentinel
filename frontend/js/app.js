@@ -234,6 +234,127 @@ class DashboardApp {
     }
   }
 
+  async inspectFileForSonar(file) {
+    const name = file.name.toLowerCase();
+    // Fast path: GIS GeoTIFF bathymetric mosaics
+    if (name.endsWith('.tif') || name.endsWith('.tiff')) {
+      return { isSonar: true };
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxDim = 256;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.max(16, Math.round((h * maxDim) / w));
+                w = maxDim;
+              } else {
+                w = Math.max(16, Math.round((w * maxDim) / h));
+                h = maxDim;
+              }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const d = imgData.data;
+            const totalPixels = w * h;
+
+            let totalDiff = 0;
+            let whitePixels = 0;
+
+            for (let i = 0; i < d.length; i += 4) {
+              const r = d[i];
+              const g = d[i + 1];
+              const b = d[i + 2];
+
+              // Optical RGB channel divergence
+              const diff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+              totalDiff += diff;
+
+              // Pure saturated white clipping (typical of documents, memes, anime)
+              if (r >= 253 && g >= 253 && b >= 253) {
+                whitePixels++;
+              }
+            }
+
+            const avgChannelDiff = totalDiff / totalPixels;
+            const whiteRatio = whitePixels / totalPixels;
+
+            if (avgChannelDiff > 8.0) {
+              resolve({
+                isSonar: false,
+                reason: `Optical chromatic color spectrum detected (RGB divergence: ${avgChannelDiff.toFixed(1)}). Side-Scan Sonar records single-channel acoustic backscatter reverberation, not multi-channel optical light.`
+              });
+              return;
+            }
+
+            if (whiteRatio > 0.08) {
+              resolve({
+                isSonar: false,
+                reason: `Excessive saturated white clipping detected (${(whiteRatio * 100).toFixed(1)}%). Typical of digital documents, line art, or screenshots, not acoustic seabed backscatter.`
+              });
+              return;
+            }
+
+            resolve({ isSonar: true, previewUrl: e.target.result });
+          } catch (err) {
+            console.warn("Client pre-inspection error:", err);
+            resolve({ isSonar: true, previewUrl: e.target.result });
+          }
+        };
+        img.onerror = () => resolve({ isSonar: false, reason: "Unable to decode image raster." });
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve({ isSonar: false, reason: "Failed to read image file from disk." });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async handleFileSelection(file) {
+    if (!file) return;
+    this.uploadedFile = file;
+    this.currentSample = null;
+    document.querySelectorAll('.sample-pill').forEach(b => b.classList.remove('active'));
+
+    // Client-side quick acoustic check
+    const check = await this.inspectFileForSonar(file);
+    if (!check.isSonar) {
+      this.handlePipelineRejection(check.reason);
+      return;
+    }
+
+    await this.executeAIPipeline();
+  }
+
+  switchToMapAndFly(targetId) {
+    const tabMap = document.getElementById('tabMap') || document.querySelector('.tab-btn[data-tab="map"]');
+    if (tabMap) tabMap.click();
+    setTimeout(() => {
+      if (this.map) this.map.flyToTarget(targetId);
+    }, 200);
+  }
+
+  _downloadFile(filename, content, mimeType = "text/plain") {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   showToast({ type = "error", title = "Notification", message = "", duration = 6500 }) {
     const container = document.getElementById('appToastContainer');
     if (!container) return;
@@ -712,6 +833,9 @@ class DashboardApp {
     // Sort targets according to currentSort
     const sortedTargets = [...this.targets].sort((a, b) => {
       if (this.currentSort === 'priority') {
+        const bothA = (a.source_category === 'BOTH' || (a.sources && a.sources.length > 1)) ? 1 : 0;
+        const bothB = (b.source_category === 'BOTH' || (b.sources && b.sources.length > 1)) ? 1 : 0;
+        if (bothA !== bothB) return bothB - bothA; // Simultaneous dual-path agreed targets first
         const pA = a.priority_score != null ? a.priority_score : (a.calibrated_confidence || 0.8) * 100;
         const pB = b.priority_score != null ? b.priority_score : (b.calibrated_confidence || 0.8) * 100;
         return pB - pA;
@@ -788,71 +912,64 @@ class DashboardApp {
       else if (classLower.includes('container') || classLower.includes('box')) iconClass = 'fa-solid fa-cube';
       else if (classLower.includes('rock') || classLower.includes('benthos')) iconClass = 'fa-solid fa-mountain';
 
+      const risk = (t.risk_score || hazardLevel).toUpperCase();
+      const isHigher = prioLevel === 'CRITICAL' || prioLevel === 'HIGH' || conf > 75;
+      const accVal = t.accuracy_score != null ? Math.round(t.accuracy_score * 100) : Math.min(99, Math.round(conf * 0.98 + (t.shadow_verified ? 4 : 0)));
+      const accStr = `${accVal}`;
+
       item.innerHTML = `
         <div class="target-card-header">
           <div class="target-title-left">
             <span class="target-index-pill">#${idx + 1}</span>
             <div>
-              <span class="target-name"><i class="${iconClass}"></i> ${cleanClass}</span>
+              <span class="target-name" title="${cleanClass}"><i class="${iconClass}"></i> ${cleanClass}</span>
               <span class="target-id">${t.object_id}</span>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:4px;">
-            <span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span>
-            <span class="hazard-badge ${risk}">${risk}</span>
-          </div>
-        </div>
-        <div class="target-card-tags">
-          <span class="chip-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
-          <span class="priority-badge ${isHigher ? 'higher' : 'lower'}">${isHigher ? '▲ HIGHER' : '▼ LOWER'}</span>
-          ${t.memory_corrected ? `<span class="chip-memory-corrected" title="Auto-corrected from ${t.original_model_class || 'previous'}" style="margin-left: 2px;"><i class="fa-solid fa-lightbulb"></i> Corrected</span>` : ''}
-          <button type="button" class="btn-target-feedback" data-obj-id="${t.object_id}" title="Provide human feedback / correct detection" style="margin-left: auto;"><i class="fa-solid fa-comment-dots"></i> Feedback</button>
-        </div>
-        <div class="target-card-metrics">
-          <div class="metric-item">
-            <span class="metric-lbl">Confidence</span>
-            <span class="metric-val cyan">${conf}%</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-lbl">Accuracy</span>
-            <span class="metric-val green">${accStr}%</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-lbl">Relief</span>
-            <span class="metric-val ${t.shadow_verified ? 'cyan' : 'gray'}">${t.shadow_verified ? 'Shadow Void' : 'Low Relief'}</span>
+          <div class="target-header-badges">
+            <span class="provenance-tag ${srcTagClass}" title="${srcCat === 'BOTH' ? 'Dual-Model Consensus: Verified by YOLOv11 (Bounding Box) & Attention U-Net (Pixel Mask)' : srcTagLabel}">${srcTagLabel}</span>
+            <span class="hazard-badge ${risk}" title="Hazard Risk: ${hazardScore}/100 (${hazardLevel})">${risk}</span>
           </div>
         </div>
 
-        <div class="target-score-badges-row">
+        <div class="target-card-row-prio">
           <span class="score-pill prio-${prioLevel.toLowerCase()}" title="Inspection Priority Score: ${prioScore}/100 (${prioLevel})">
             <i class="fa-solid fa-bolt"></i> PRIORITY ${prioScore}/100 <span class="score-level-badge">${prioLevel}</span>
           </span>
-          <span class="score-pill conf" title="AI Detection Confidence: ${conf}%">
-            <i class="fa-solid fa-crosshairs"></i> CONF ${conf}%
-          </span>
-          <span class="score-pill hazard-${hazardLevel.toLowerCase()}" title="Environmental & Operational Hazard Risk: ${hazardScore}/100 (${hazardLevel})">
-            <i class="fa-solid fa-triangle-exclamation"></i> HAZARD ${hazardScore}/100 <span class="score-level-badge">${hazardLevel}</span>
-          </span>
+          <span class="chip-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
+          ${t.memory_corrected ? `<span class="chip-memory-corrected" title="Auto-corrected from ${t.original_model_class || 'previous'}"><i class="fa-solid fa-lightbulb"></i> Corrected</span>` : ''}
+        </div>
+
+        <div class="target-card-row-mid">
+          <div class="target-card-chips">
+            ${srcCat === 'BOTH' ? `<span class="score-pill prov-dual" title="Parallel Dual-Path Consensus: Both YOLO & U-Net Active"><i class="fa-solid fa-layer-group"></i> YOLO + U-Net</span>` : ''}
+            <span class="score-pill conf" title="AI Detection Confidence: ${conf}%"><i class="fa-solid fa-crosshairs"></i> CONF ${conf}%</span>
+            <span class="score-pill hazard-${hazardLevel.toLowerCase()}" title="Hazard Risk: ${hazardScore}/100"><i class="fa-solid fa-triangle-exclamation"></i> HAZARD ${hazardScore}/100</span>
+            <span class="score-pill relief" title="Acoustic Shadow Relief"><i class="fa-solid fa-water"></i> ${t.shadow_verified ? 'Void Shadow' : 'Low Relief'}</span>
+          </div>
+          <button type="button" class="btn-target-feedback" data-obj-id="${t.object_id}" title="Human Feedback / Correct Detection"><i class="fa-solid fa-comment-dots"></i> Feedback</button>
         </div>
 
         <div class="target-card-meta">
-          <div class="meta-row">
-            <span><i class="fa-solid fa-ruler-combined"></i> Physical Extent:</span>
-            <span class="mono">${lenM}m × ${widM}m (${areaM} m²)</span>
+          <div class="meta-left">
+            <span class="meta-item"><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m (${areaM} m²)</span>
+            <span class="meta-item mono">${geoLabel}</span>
           </div>
-          <div class="meta-row">
-            <span><i class="fa-solid fa-compass"></i> Geolocation:</span>
-            <span class="mono">${geoLabel}</span>
+          <div class="target-card-actions">
+            ${hasCoords ? `<button type="button" class="btn-locate-map" data-target-id="${t.object_id}" title="Center and fly to target on tactical map"><i class="fa-solid fa-map-location-dot"></i> Map</button>` : ''}
+            <button type="button" class="btn-why-score" data-target-id="${t.object_id}" title="Inspect explainable score breakdown"><i class="fa-solid fa-circle-question"></i> Why score?</button>
           </div>
-        </div>
-
-        <div class="target-card-footer">
-          <span class="tag-status ${statusClass}"><i class="fa-solid fa-circle-dot"></i> ${statusLabel}</span>
-          <button class="btn-why-score" data-target-id="${t.object_id}" title="Inspect explainable score breakdown">
-            <i class="fa-solid fa-circle-question"></i> Why this score?
-          </button>
         </div>
       `;
+
+      const locBtn = item.querySelector('.btn-locate-map');
+      if (locBtn) {
+        locBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.onTargetSelected(t.object_id, { fly: true, force: true });
+          this.switchToMapAndFly(t.object_id);
+        };
+      }
 
       const whyBtn = item.querySelector('.btn-why-score');
       if (whyBtn) {
@@ -1053,11 +1170,15 @@ class DashboardApp {
       const hazardScore = target.hazard_score != null ? Math.round(target.hazard_score) : 75;
       const confScore = Math.round((target.calibrated_confidence || target.confidence || 0.85) * 100);
 
+      let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : null);
+      let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : null);
+      const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
+
       physicsEl.innerHTML = `
         <div class="physics-grid">
           <div class="physics-cell">
             <span class="p-lbl">PROVENANCE:</span>
-            <span class="p-val ${srcCat === 'BOTH' ? 'cyan' : (srcCat === 'UNET_ONLY' ? 'magenta' : 'orange')}">${srcCat}</span>
+            <span class="p-val ${srcCat === 'BOTH' ? 'cyan' : (srcCat === 'UNET_ONLY' ? 'magenta' : 'orange')}">${srcCat === 'BOTH' ? 'YOLOv11 + Attention U-Net (Dual)' : srcCat.replace('_', ' ')}</span>
           </div>
           <div class="physics-cell">
             <span class="p-lbl">AI CONFIDENCE:</span>
@@ -1071,8 +1192,22 @@ class DashboardApp {
             <span class="p-lbl">PRIORITY SCORE:</span>
             <span class="p-val cyan">${prioScore}/100 (${prioLevel})</span>
           </div>
+          ${hasCoords ? `
+          <div class="physics-cell full-width" style="grid-column: 1 / -1; display:flex; justify-content:space-between; align-items:center; background:rgba(0,240,255,0.06); padding:6px 10px; border-radius:6px; border:1px solid rgba(0,240,255,0.2);">
+            <div>
+              <span class="p-lbl" style="display:block; font-size:0.68rem; color:#94a3b8;">GEOLOCATION (WGS84):</span>
+              <span class="p-val cyan" style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.85rem;"><i class="fa-solid fa-crosshairs"></i> ${lat.toFixed(5)}°, ${lon.toFixed(5)}°</span>
+            </div>
+            <button type="button" id="btnFlyTargetMap" style="background:rgba(0,240,255,0.2); color:#00f0ff; border:1px solid rgba(0,240,255,0.45); padding:4px 10px; border-radius:4px; font-size:0.75rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-map-location-dot"></i> Fly to Target</button>
+          </div>
+          ` : ''}
         </div>
       `;
+
+      const btnFly = physicsEl.querySelector('#btnFlyTargetMap');
+      if (btnFly) {
+        btnFly.onclick = () => this.switchToMapAndFly(target.object_id);
+      }
     }
   }
 
@@ -1562,11 +1697,7 @@ class DashboardApp {
 
       fileInput.onchange = async (e) => {
         if (e.target.files && e.target.files.length > 0) {
-          const file = e.target.files[0];
-          this.uploadedFile = file;
-          this.currentSample = null;
-          document.querySelectorAll('.sample-pill').forEach(b => b.classList.remove('active'));
-          await this.executeAIPipeline();
+          await this.handleFileSelection(e.target.files[0]);
         }
       };
 
@@ -1583,11 +1714,7 @@ class DashboardApp {
         e.preventDefault();
         dropzone.classList.remove('drag-over');
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          const file = e.dataTransfer.files[0];
-          this.uploadedFile = file;
-          this.currentSample = null;
-          document.querySelectorAll('.sample-pill').forEach(b => b.classList.remove('active'));
-          await this.executeAIPipeline();
+          await this.handleFileSelection(e.dataTransfer.files[0]);
         }
       };
     }
@@ -1691,6 +1818,8 @@ class DashboardApp {
         if (am && am.style.display === 'flex') am.style.display = 'none';
         const rm = document.getElementById('missionReportModal');
         if (rm && rm.style.display === 'flex') rm.style.display = 'none';
+        const fm = document.getElementById('feedbackModal');
+        if (fm && fm.style.display === 'flex') fm.style.display = 'none';
         const syncM = document.getElementById('syncModal');
         if (syncM && syncM.style.display === 'flex') syncM.style.display = 'none';
         const modM = document.getElementById('modelModal');
@@ -1706,6 +1835,62 @@ class DashboardApp {
         btnToggleSwath.classList.toggle('active', active);
       };
     }
+
+    // Setup Review System Quick Chips and Submit
+    const reviewBox = document.getElementById('reviewCommentBox');
+    const quickChips = document.querySelectorAll('.review-quick-chips .quick-chip');
+    quickChips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (reviewBox) {
+          reviewBox.value = chip.dataset.text;
+          reviewBox.focus();
+        }
+      });
+    });
+
+    const btnSubmitReview = document.getElementById('btnSubmitReviewComment');
+    if (btnSubmitReview) {
+      btnSubmitReview.addEventListener('click', () => {
+        this.submitInlineReviewComment();
+      });
+    }
+
+    const reviewSelect = document.getElementById('reviewTargetSelect');
+    if (reviewSelect) {
+      reviewSelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val) {
+          this.onTargetSelected(val, { fly: true });
+        }
+      });
+    }
+
+    // Target Feedback Modal event listeners
+    const btnCloseFeedback = document.getElementById('btnCloseFeedbackModal');
+    const feedbackModal = document.getElementById('feedbackModal');
+    if (btnCloseFeedback && feedbackModal) {
+      btnCloseFeedback.onclick = () => { feedbackModal.style.display = 'none'; };
+      feedbackModal.onclick = (e) => {
+        if (e.target === feedbackModal) feedbackModal.style.display = 'none';
+      };
+    }
+
+    const btnSubmitFb = document.getElementById('btnSubmitFeedback');
+    if (btnSubmitFb) {
+      btnSubmitFb.onclick = () => this.submitCurrentFeedback();
+    }
+
+    document.querySelectorAll('.chip-feedback').forEach(btn => {
+      btn.onclick = () => {
+        const text = btn.dataset.text;
+        const input = document.getElementById('feedbackCommentInput');
+        if (input && text) {
+          input.value = text;
+          input.focus();
+        }
+      };
+    });
 
     // Local GIS Layer Checkboxes
     const gisCheckboxes = [
