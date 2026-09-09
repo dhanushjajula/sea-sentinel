@@ -118,11 +118,20 @@ class SonarPreprocessor:
                 "reason": "Minimum resolution required is 24x24."
             }
 
-        # Accept all decodable raster formats and inspect dimensions
+        # Automatically adapt RGB/optical photos and images into acoustic luminance
+        is_optical = False
+        diagnostic_msg = "Valid Side-Scan Sonar acoustic raster"
         if img.ndim == 3 and img.shape[2] >= 3:
-            gray = cv2.cvtColor(img[:, :, :3], cv2.COLOR_BGR2GRAY)
-        else:
-            gray = img if img.ndim == 2 else img[:, :, 0]
+            b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+            diff_rg = float(np.mean(np.abs(r.astype(float) - g.astype(float))))
+            diff_rb = float(np.mean(np.abs(r.astype(float) - b.astype(float))))
+            diff_gb = float(np.mean(np.abs(g.astype(float) - b.astype(float))))
+            max_diff = max(diff_rg, diff_rb, diff_gb)
+            hsv = cv2.cvtColor(img[:, :, :3], cv2.COLOR_BGR2HSV)
+            sat_mean = float(np.mean(hsv[:, :, 1])) / 255.0
+            if sat_mean > 0.08 or max_diff > 8.0:
+                is_optical = True
+                diagnostic_msg = "Optical/RGB photo converted to acoustic luminance grayscale for dual-path AI detection"
 
         return {
             "valid": True,
@@ -132,7 +141,8 @@ class SonarPreprocessor:
             "size_bytes": file_size_bytes,
             "dimensions": {"width": w, "height": h},
             "status": "ready_for_preprocessing",
-            "diagnostic": "Valid Side-Scan Sonar acoustic raster"
+            "is_optical_converted": is_optical,
+            "diagnostic": diagnostic_msg
         }
 
     def load_image_as_grayscale(self, image_input: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
