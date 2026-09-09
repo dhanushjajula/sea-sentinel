@@ -425,7 +425,6 @@ class SeaSentinelAPI {
     }
     return { status: "offline", surveys: [] };
   }
-  }
 }
 
 window.apiService = new SeaSentinelAPI();
