@@ -260,3 +260,29 @@ def test_end_to_end_edge_perception_pipeline():
     assert "total_pipeline_ms" in res["timing_breakdown"]
     assert "nav_state" in res
     assert res["nav_state"]["depth_m"] > 0
+
+
+if __name__ == "__main__":
+    tests = [
+        test_bounded_frame_buffer_drop_policy,
+        test_sonar_quality_gate,
+        test_adaptive_preprocessor,
+        test_unknown_object_detector,
+        test_uncertainty_calibration_engine,
+        test_sonar_kalman_tracker,
+        test_edge_resource_manager_degradation,
+        test_watchdog_and_integrity,
+        test_acoustic_telemetry_modem_packing,
+        test_active_learning_and_continual_safety,
+        test_end_to_end_edge_perception_pipeline,
+    ]
+    passed = 0
+    for t in tests:
+        try:
+            t()
+            print(f"[PASS] {t.__name__}")
+            passed += 1
+        except Exception as e:
+            print(f"[FAIL] {t.__name__}: {e}")
+            raise
+    print(f"\nAll {passed}/{len(tests)} Edge AI tests passed successfully!")
