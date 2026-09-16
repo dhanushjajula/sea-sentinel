@@ -440,7 +440,7 @@ class CurrentInputGISMap {
       const color = GIS_CONFIG.getColorForClass(clsName);
       const conf = Number(t.calibrated_confidence || t.confidence || 0.85);
       const confPct = Math.round(conf * 100);
-      const sonarConf = t.sonar_aware_confidence != null ? Math.round(Number(t.sonar_aware_confidence) * 100) : confPct;
+      const sonarConf = t.sonar_aware_confidence != null ? Math.round(Number(t.sonar_aware_confidence) > 1 ? Number(t.sonar_aware_confidence) : Number(t.sonar_aware_confidence) * 100) : confPct;
 
       const iconHtml = `
         <div class="current-input-marker" style="--marker-color:${color};">
@@ -1159,7 +1159,7 @@ class GlobalOceanGISMap {
     const color = GIS_CONFIG.getColorForClass(clsName);
     const conf = Number(t.calibrated_confidence || t.confidence || 0.85);
     const confPct = Math.round(conf * 100);
-    const sonarConf = t.sonar_aware_confidence != null ? Math.round(Number(t.sonar_aware_confidence) * 100) : confPct;
+    const sonarConf = t.sonar_aware_confidence != null ? Math.round(Number(t.sonar_aware_confidence) > 1 ? Number(t.sonar_aware_confidence) : Number(t.sonar_aware_confidence) * 100) : confPct;
     const surveyId = t.survey_id || "SURVEY_RECORD";
     const dateTimeStr = t.detected_at || t.timestamp || "2026-09-12 14:30 UTC";
     const reviewStatus = (t.review_status || 'UNREVIEWED').toUpperCase();
