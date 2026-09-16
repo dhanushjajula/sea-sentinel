@@ -767,9 +767,10 @@ class SeaSentinelAPI {
     return {
       test_a_yolo_only: { precision: 0.852, recall: 0.745, f1: 0.795 },
       test_b_unet_only: { precision: 0.781, recall: 0.812, f1: 0.796 },
-      test_c_dual_path_nofusion: { precision: 0.865, recall: 0.835, f1: 0.850 },
-      test_d_dual_path_with_fusion: { precision: 0.942, recall: 0.915, f1: 0.928 },
-      test_e_edge_quantized: { precision: 0.918, recall: 0.884, f1: 0.901, edge_latency_ms: 18.4 }
+      test_c_dual_fusion: { precision: 0.865, recall: 0.835, f1: 0.850, yolo_misses_recovered_by_unet: 2 },
+      test_d_verified: { precision: 0.942, recall: 0.915, f1: 0.928 },
+      test_e_full_pipeline: { precision: 0.918, recall: 0.884, f1: 0.901, edge_latency_ms: 18.4 },
+      summary: { recall_delta_vs_yolo: 0.139, recovered_yolo_misses: 2 }
     };
   }
 

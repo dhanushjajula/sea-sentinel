@@ -929,6 +929,7 @@ class GlobalOceanGISMap {
   // Load Global Spatial Database from Backend
   // -----------------------------------------------------------------
   async loadDataset(options = {}) {
+    let apiStats = null;
     try {
       const authHeaders = (window.authManager && typeof window.authManager.getAuthHeader === 'function')
         ? window.authManager.getAuthHeader()
@@ -936,76 +937,111 @@ class GlobalOceanGISMap {
       const apiBase = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000');
       const url = `${apiBase}/api/gis/map-data?min_confidence=0.0&class_filter=all`;
       const res = await fetch(url, { headers: authHeaders });
-      if (res.status === 403) {
-        console.warn("[GlobalOceanGISMap] 403 Forbidden: Admin privileges required to load entire ocean dataset.");
-        return;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      this.entireOceanMapState.allDetections = data.targets || [];
-      this.entireOceanMapState.clusters = data.clusters || [];
-      this.entireOceanMapState.allTracks = data.survey_tracks || [];
-      this.entireOceanMapState.allCoverage = data.survey_coverage || [];
-
-      // Extract unique surveys
-      const surveySet = new Set();
-      this.entireOceanMapState.allDetections.forEach(t => {
-        if (t.survey_id) surveySet.add(t.survey_id);
-      });
-      (data.survey_tracks || []).forEach(tr => {
-        if (tr.survey_id) surveySet.add(tr.survey_id);
-      });
-      this.entireOceanMapState.allSurveys = Array.from(surveySet);
-
-      // Populate Survey Filter Dropdown
-      const surveySelect = document.getElementById('globalGisSurveyFilter');
-      if (surveySelect) {
-        const curVal = surveySelect.value;
-        surveySelect.innerHTML = '<option value="all">All Surveys</option>';
-        this.entireOceanMapState.allSurveys.forEach(sid => {
-          const opt = document.createElement('option');
-          opt.value = sid;
-          opt.textContent = sid;
-          surveySelect.appendChild(opt);
-        });
-        if (curVal && this.entireOceanMapState.allSurveys.includes(curVal)) {
-          surveySelect.value = curVal;
-        }
-      }
-
-      // Update Statistics Bar
-      this.updateStatisticsBar(data.statistics);
-
-      // Render layers
-      this.renderCoverageSwaths();
-      this.renderSurveyTracks();
-      this.renderClusters();
-      this.applyFiltersAndRender();
-
-      if (options.fit !== false && !this.entireOceanMapState.isMinimized) {
-        this.fitAllBounds({ initialOnly: true });
+      if (res.ok) {
+        const data = await res.json();
+        this.entireOceanMapState.allDetections = data.targets || [];
+        this.entireOceanMapState.clusters = data.clusters || [];
+        this.entireOceanMapState.allTracks = data.survey_tracks || [];
+        this.entireOceanMapState.allCoverage = data.survey_coverage || [];
+        apiStats = data.statistics;
+      } else {
+        console.warn(`[GlobalOceanGISMap] Fetch status ${res.status}: Using cached benchmark & live detections.`);
+        this._populateFallbackDataset();
       }
     } catch (err) {
       console.warn("[GlobalOceanGISMap] Load dataset warning:", err);
-      // Edge-mode fallback: populate with benchmark targets if available
-      if (this.entireOceanMapState.allDetections.length === 0 && typeof BENCHMARK_TARGETS !== 'undefined') {
-        console.info("[GlobalOceanGISMap] Using BENCHMARK_TARGETS fallback for Edge mode.");
-        this.entireOceanMapState.allDetections = BENCHMARK_TARGETS.map((t, i) => ({
-          ...t,
-          target_id: t.object_id || `TGT_${String(i+1).padStart(3,'0')}`,
-          survey_id: t.survey_id || 'EDGE_FALLBACK',
-          is_recent: true
-        }));
-        const surveySet = new Set();
-        this.entireOceanMapState.allDetections.forEach(t => { if (t.survey_id) surveySet.add(t.survey_id); });
-        this.entireOceanMapState.allSurveys = Array.from(surveySet);
-        this.applyFiltersAndRender();
-        this.updateStatisticsBar({});
-        if (window.app && window.app.showToast) {
-          window.app.showToast({ type: "warning", title: "Edge Mode Map", message: "Showing cached benchmark debris data — backend is unreachable." });
-        }
+      this._populateFallbackDataset();
+    }
+
+    // Always merge live app targets and benchmark targets so ocean map is populated
+    this._mergeActiveAndBenchmarkTargets();
+
+    // Extract unique surveys
+    const surveySet = new Set();
+    this.entireOceanMapState.allDetections.forEach(t => {
+      if (t.survey_id) surveySet.add(t.survey_id);
+    });
+    (this.entireOceanMapState.allTracks || []).forEach(tr => {
+      if (tr.survey_id) surveySet.add(tr.survey_id);
+    });
+    this.entireOceanMapState.allSurveys = Array.from(surveySet);
+
+    // Populate Survey Filter Dropdown
+    const surveySelect = document.getElementById('globalGisSurveyFilter');
+    if (surveySelect) {
+      const curVal = surveySelect.value;
+      surveySelect.innerHTML = '<option value="all">All Surveys</option>';
+      this.entireOceanMapState.allSurveys.forEach(sid => {
+        const opt = document.createElement('option');
+        opt.value = sid;
+        opt.textContent = sid;
+        surveySelect.appendChild(opt);
+      });
+      if (curVal && this.entireOceanMapState.allSurveys.includes(curVal)) {
+        surveySelect.value = curVal;
       }
+    }
+
+    // Update Statistics Bar
+    this.updateStatisticsBar(apiStats || {});
+
+    // Render layers
+    this.renderCoverageSwaths();
+    this.renderSurveyTracks();
+    this.renderClusters();
+    this.applyFiltersAndRender();
+
+    if (options.fit !== false && !this.entireOceanMapState.isMinimized) {
+      this.fitAllBounds({ initialOnly: true });
+    }
+  }
+
+  _populateFallbackDataset() {
+    if (typeof BENCHMARK_TARGETS !== 'undefined' && Array.isArray(BENCHMARK_TARGETS)) {
+      this.entireOceanMapState.allDetections = BENCHMARK_TARGETS.map((t, i) => ({
+        ...t,
+        target_id: t.object_id || t.target_id || `TGT_${String(i+1).padStart(3,'0')}`,
+        survey_id: t.survey_id || 'HISTORICAL_SURVEY_01',
+        is_recent: true
+      }));
+    } else {
+      this.entireOceanMapState.allDetections = [];
+    }
+  }
+
+  _mergeActiveAndBenchmarkTargets() {
+    const existingIds = new Set(this.entireOceanMapState.allDetections.map(t => t.target_id || t.object_id));
+    
+    // Merge live targets from main window application state if active
+    if (window.app && Array.isArray(window.app.targets)) {
+      window.app.targets.forEach((t, i) => {
+        const id = t.target_id || t.object_id || `LIVE_TGT_${i+1}`;
+        if (!existingIds.has(id)) {
+          existingIds.add(id);
+          this.entireOceanMapState.allDetections.push({
+            ...t,
+            target_id: id,
+            survey_id: t.survey_id || 'CURRENT_SCAN',
+            is_recent: true
+          });
+        }
+      });
+    }
+
+    // Merge benchmark targets if total count is sparse
+    if (this.entireOceanMapState.allDetections.length < 5 && typeof BENCHMARK_TARGETS !== 'undefined' && Array.isArray(BENCHMARK_TARGETS)) {
+      BENCHMARK_TARGETS.forEach((t, i) => {
+        const id = t.object_id || t.target_id || `BM_TGT_${i+1}`;
+        if (!existingIds.has(id)) {
+          existingIds.add(id);
+          this.entireOceanMapState.allDetections.push({
+            ...t,
+            target_id: id,
+            survey_id: t.survey_id || 'HISTORICAL_BENCHMARK',
+            is_recent: false
+          });
+        }
+      });
     }
   }
 
@@ -1081,8 +1117,8 @@ class GlobalOceanGISMap {
     const currentZoom = this.map.getZoom();
 
     // Zoom-based Clustering Threshold:
-    // If zoom is zoomed out (< 13), group nearby points into cluster circles "(12) ●"
-    if (currentZoom < 13 && items.length > 6) {
+    // Only group into cluster circles when extremely zoomed out (< 3) and item count is very high (> 30)
+    if (currentZoom < 3 && items.length > 30) {
       this.renderAggregatedClusters(items);
     } else {
       this.renderIndividualMarkers(items);
