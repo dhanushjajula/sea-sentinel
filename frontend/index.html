@@ -591,13 +591,27 @@
                 <span class="badge-pill confirmed" style="font-size: 0.65rem;">DUAL CHANNEL</span>
               </div>
 
-              <!-- View Mode Toggle Buttons -->
-              <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- View Mode Toggle & Zoom Buttons -->
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <div class="sonar-pills-group" id="viewModeContainer">
                   <button class="sonar-pill-btn" data-mode="raw" id="btnModeRaw"><i class="fa-solid fa-wave-square"></i> Raw Scan</button>
                   <button class="sonar-pill-btn" data-mode="enhanced" id="btnModeEnhanced"><i class="fa-solid fa-wand-magic-sparkles"></i> Enhanced</button>
                   <button class="sonar-pill-btn active" data-mode="overlay" id="btnModeOverlay"><i class="fa-solid fa-layer-group"></i> Detections &amp; Masks</button>
                 </div>
+
+                <!-- Sonar Waterfall Zoom Controls -->
+                <div class="sonar-pills-group" id="waterfallZoomGroup" style="display: inline-flex; align-items: center;">
+                  <button class="sonar-pill-btn" id="btnWaterfallZoomIn" title="Zoom In (+)" type="button" onclick="if(window.app && window.app.waterfall) window.app.waterfall.zoomIn();" style="padding: 4px 8px;">
+                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                  </button>
+                  <button class="sonar-pill-btn" id="btnWaterfallZoomOut" title="Zoom Out (-)" type="button" onclick="if(window.app && window.app.waterfall) window.app.waterfall.zoomOut();" style="padding: 4px 8px;">
+                    <i class="fa-solid fa-magnifying-glass-minus"></i>
+                  </button>
+                  <button class="sonar-pill-btn" id="btnWaterfallZoomReset" title="Reset Zoom (1:1 / Double click scan to toggle)" type="button" onclick="if(window.app && window.app.waterfall) window.app.waterfall.resetZoom();" style="padding: 4px 8px; font-family: var(--font-mono); font-size: 0.70rem;">
+                    <i class="fa-solid fa-expand"></i> <span id="waterfallZoomLevel">100%</span>
+                  </button>
+                </div>
+
                 <span class="meta-pill"><i class="fa-solid fa-ruler-horizontal"></i> Range 200m</span>
               </div>
             </div>

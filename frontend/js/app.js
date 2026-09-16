@@ -1867,7 +1867,7 @@ class DashboardApp {
     content.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--cyan-beam);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><div style="margin-top: 10px;">Computing Quantitative Ablation Benchmarks...</div></div>';
 
     try {
-      const data = await window.apiService.fetchAblationResults();
+      const data = await window.apiService.fetchAblationResults(this.targets);
       this.renderAblationTable(data, content);
     } catch (err) {
       content.innerHTML = `<div style="padding: 24px; color: var(--coral-danger);">Failed to load ablation metrics: ${err.message}</div>`;
@@ -2721,47 +2721,140 @@ class DashboardApp {
       return imgUrl;
     };
 
-    // Extract live canvas snapshots from active waterfall if available
+    // Extract live canvas snapshots from active waterfall with exact natural dimensions and aspect ratio
     let waterfallCanvasDataUrl = null;
     let rawCanvasDataUrl = null;
     let enhancedCanvasDataUrl = null;
 
+    let detections = (this.targets && this.targets.length > 0)
+      ? this.targets
+      : ((res.detections && res.detections.length > 0) ? res.detections : DEFAULT_REPORT_TARGETS);
+
     try {
-      if (this.waterfall && this.waterfall.canvas && this.waterfall.canvas.width > 0) {
-        waterfallCanvasDataUrl = this.waterfall.canvas.toDataURL('image/jpeg', 0.92);
-      }
       if (this.waterfall && this.waterfall.rawImage && this.waterfall.rawImage.complete && this.waterfall.rawImage.naturalWidth > 0) {
+        const natW = this.waterfall.rawImage.naturalWidth;
+        const natH = this.waterfall.rawImage.naturalHeight;
+
+        // 1. Raw Acoustic Snapshot
         const offCanvas = document.createElement('canvas');
-        offCanvas.width = this.waterfall.rawImage.naturalWidth;
-        offCanvas.height = this.waterfall.rawImage.naturalHeight;
+        offCanvas.width = natW;
+        offCanvas.height = natH;
         const oCtx = offCanvas.getContext('2d');
-        oCtx.drawImage(this.waterfall.rawImage, 0, 0);
+        oCtx.drawImage(this.waterfall.rawImage, 0, 0, natW, natH);
         rawCanvasDataUrl = offCanvas.toDataURL('image/jpeg', 0.90);
 
+        // 2. Contrast Enhanced Snapshot
+        const enhCanvas = document.createElement('canvas');
+        enhCanvas.width = natW;
+        enhCanvas.height = natH;
+        const eCtx = enhCanvas.getContext('2d');
         if (this.waterfall.enhancedImage && this.waterfall.enhancedImage.complete && this.waterfall.enhancedImage.naturalWidth > 0) {
-          const enhCanvas = document.createElement('canvas');
-          enhCanvas.width = this.waterfall.enhancedImage.naturalWidth;
-          enhCanvas.height = this.waterfall.enhancedImage.naturalHeight;
-          const eCtx = enhCanvas.getContext('2d');
-          eCtx.drawImage(this.waterfall.enhancedImage, 0, 0);
-          enhancedCanvasDataUrl = enhCanvas.toDataURL('image/jpeg', 0.90);
+          eCtx.drawImage(this.waterfall.enhancedImage, 0, 0, natW, natH);
         } else {
-          oCtx.filter = 'contrast(1.4) brightness(1.08)';
-          oCtx.drawImage(this.waterfall.rawImage, 0, 0);
-          enhancedCanvasDataUrl = offCanvas.toDataURL('image/jpeg', 0.90);
+          eCtx.filter = 'contrast(1.4) brightness(1.08)';
+          eCtx.drawImage(this.waterfall.rawImage, 0, 0, natW, natH);
         }
+        enhancedCanvasDataUrl = enhCanvas.toDataURL('image/jpeg', 0.90);
+
+        // 3. Fused AI Output Snapshot (exact natural resolution & 1:1 aspect ratio match)
+        const annotCanvas = document.createElement('canvas');
+        annotCanvas.width = natW;
+        annotCanvas.height = natH;
+        const aCtx = annotCanvas.getContext('2d');
+        aCtx.drawImage(enhCanvas, 0, 0);
+
+        // Draw U-Net segmentation polygon fills and contours
+        detections.forEach(t => {
+          let poly = t.polygon || t.pixel_polygon;
+          if (poly && poly.length >= 3) {
+            aCtx.save();
+            aCtx.beginPath();
+            const isNorm = poly.every(pt => pt[0] <= 1.05 && pt[1] <= 1.05);
+            const scaleX = isNorm ? natW : (natW / (t.image_width || natW));
+            const scaleY = isNorm ? natH : (natH / (t.image_height || natH));
+            aCtx.moveTo(poly[0][0] * scaleX, poly[0][1] * scaleY);
+            for (let i = 1; i < poly.length; i++) {
+              aCtx.lineTo(poly[i][0] * scaleX, poly[i][1] * scaleY);
+            }
+            aCtx.closePath();
+            aCtx.fillStyle = "rgba(0, 240, 255, 0.28)";
+            aCtx.fill();
+            aCtx.lineWidth = Math.max(2, natW * 0.0035);
+            aCtx.strokeStyle = "#00f0ff";
+            aCtx.shadowColor = "#00f0ff";
+            aCtx.shadowBlur = 8;
+            aCtx.stroke();
+            aCtx.restore();
+          }
+        });
+
+        // Draw YOLO bounding boxes and crisp label badges
+        detections.forEach((t, idx) => {
+          let bbox = t.norm_bbox;
+          let x1, y1, x2, y2;
+          if (bbox) {
+            x1 = bbox.x1 * natW;
+            y1 = bbox.y1 * natH;
+            x2 = bbox.x2 * natW;
+            y2 = bbox.y2 * natH;
+          } else if (t.pixel_bbox) {
+            const sx = natW / (t.image_width || natW);
+            const sy = natH / (t.image_height || natH);
+            x1 = t.pixel_bbox.x1 * sx;
+            y1 = t.pixel_bbox.y1 * sy;
+            x2 = t.pixel_bbox.x2 * sx;
+            y2 = t.pixel_bbox.y2 * sy;
+          } else {
+            return;
+          }
+          const bw = x2 - x1;
+          const bh = y2 - y1;
+
+          aCtx.save();
+          aCtx.lineWidth = Math.max(2.5, natW * 0.0038);
+          aCtx.strokeStyle = "#00e676";
+          aCtx.shadowColor = "#00e676";
+          aCtx.shadowBlur = 10;
+          aCtx.strokeRect(x1, y1, bw, bh);
+
+          // Corner brackets
+          const cLen = Math.min(16, bw * 0.25, bh * 0.25);
+          aCtx.lineWidth = Math.max(3.5, natW * 0.0055);
+          aCtx.beginPath();
+          aCtx.moveTo(x1, y1 + cLen); aCtx.lineTo(x1, y1); aCtx.lineTo(x1 + cLen, y1);
+          aCtx.moveTo(x1 + bw - cLen, y1); aCtx.lineTo(x1 + bw, y1); aCtx.lineTo(x1 + bw, y1 + cLen);
+          aCtx.moveTo(x1 + bh - cLen, y1); aCtx.lineTo(x1, y1 + bh); aCtx.lineTo(x1 + cLen, y1 + bh);
+          aCtx.moveTo(x1 + bw - cLen, y1 + bh); aCtx.lineTo(x1 + bw, y1 + bh); aCtx.lineTo(x1 + bw, y1 + bh - cLen);
+          aCtx.stroke();
+
+          // Label badge
+          const confPct = Math.round((t.calibrated_confidence || t.confidence || 0.88) * 100);
+          const cleanClass = String(t.class_display || t.class || 'DEBRIS').replace(/_/g, ' ').toUpperCase();
+          const badgeText = `${cleanClass} ${confPct}%`;
+          const fontSize = Math.max(12, Math.round(natW * 0.020));
+          aCtx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+          const tagW = aCtx.measureText(badgeText).width + 16;
+          const tagH = fontSize + 10;
+          const tagY = Math.max(0, y1 - tagH);
+
+          aCtx.fillStyle = "#e00080";
+          aCtx.fillRect(x1, tagY, tagW, tagH);
+          aCtx.strokeStyle = "#ffffff";
+          aCtx.lineWidth = 1;
+          aCtx.strokeRect(x1, tagY, tagW, tagH);
+
+          aCtx.fillStyle = "#ffffff";
+          aCtx.fillText(badgeText, x1 + 8, tagY + fontSize);
+          aCtx.restore();
+        });
+
+        waterfallCanvasDataUrl = annotCanvas.toDataURL('image/jpeg', 0.92);
+      } else if (this.waterfall && this.waterfall.canvas && this.waterfall.canvas.width > 0) {
+        waterfallCanvasDataUrl = this.waterfall.canvas.toDataURL('image/jpeg', 0.92);
       }
     } catch (snapErr) {
       console.warn("Could not capture waterfall canvas snapshot for report:", snapErr);
     }
-
-    let rawUrl = rawCanvasDataUrl || resolveReportImgUrl(res.raw_image_url, 'assets/samples/SURVEY_54434B1B_raw.png');
-    let enhancedUrl = enhancedCanvasDataUrl || resolveReportImgUrl(res.enhanced_image_url, 'assets/samples/SURVEY_54434B1B_enhanced.png');
-    let annotatedUrl = waterfallCanvasDataUrl || resolveReportImgUrl(res.annotated_image_url, 'assets/samples/SURVEY_54434B1B_annotated.png');
-
-    let detections = (this.targets && this.targets.length > 0)
-      ? this.targets
-      : ((res.detections && res.detections.length > 0) ? res.detections : DEFAULT_REPORT_TARGETS);
 
     let missionId = res.analysis_id || (this.targets && this.targets[0] && this.targets[0].survey_id) || "SURVEY_54434B1B";
     let datumStr = (spatial.coordinate_system || (res.spatial_metadata && res.spatial_metadata.coordinate_system) || "WGS84 (EPSG:4326)").toUpperCase();
