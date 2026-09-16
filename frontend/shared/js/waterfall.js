@@ -33,6 +33,18 @@ class WaterfallViewer {
     this._initEvents();
   }
 
+  setTargets(targets) {
+    this.targets = targets || [];
+    if (Array.isArray(this.targets)) {
+      this.targets.forEach(t => {
+        if (typeof window.registerGisDebrisTarget === 'function') {
+          window.registerGisDebrisTarget(t);
+        }
+      });
+    }
+    this.render();
+  }
+
   _generateSyntheticWaterfall() {
     const w = this.canvas.width;
     const h = this.canvas.height;

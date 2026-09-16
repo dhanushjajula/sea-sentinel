@@ -27,10 +27,20 @@ class WaterfallViewer {
 
     // Default acoustic waterfall canvas size
     this.canvas.width = 1200;
-    this.canvas.height = 400;
-
     this._generateSyntheticWaterfall();
     this._initEvents();
+  }
+
+  setTargets(targets) {
+    this.targets = targets || [];
+    if (Array.isArray(this.targets)) {
+      this.targets.forEach(t => {
+        if (typeof window.registerGisDebrisTarget === 'function') {
+          window.registerGisDebrisTarget(t);
+        }
+      });
+    }
+    this.render();
   }
 
   _generateSyntheticWaterfall() {

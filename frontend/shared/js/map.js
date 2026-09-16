@@ -1010,31 +1010,22 @@ class GlobalOceanGISMap {
   }
 
   _mergeActiveAndBenchmarkTargets() {
-    const existingIds = new Set(this.entireOceanMapState.allDetections.map(t => t.target_id || t.object_id));
-    
-    // Merge live targets from main window application state if active
-    if (window.app && Array.isArray(window.app.targets)) {
-      window.app.targets.forEach((t, i) => {
-        const id = t.target_id || t.object_id || `LIVE_TGT_${i+1}`;
-        if (!existingIds.has(id)) {
-          existingIds.add(id);
-          this.entireOceanMapState.allDetections.push({
-            ...t,
-            target_id: id,
-            survey_id: t.survey_id || 'CURRENT_SCAN',
-            is_recent: true
-          });
-        }
+    const existingMap = new Map();
+
+    // 1. Add current in-memory targets
+    if (Array.isArray(this.entireOceanMapState.allDetections)) {
+      this.entireOceanMapState.allDetections.forEach(t => {
+        const id = t.target_id || t.object_id;
+        if (id) existingMap.set(id, t);
       });
     }
 
-    // Merge benchmark targets if total count is sparse
-    if (this.entireOceanMapState.allDetections.length < 5 && typeof BENCHMARK_TARGETS !== 'undefined' && Array.isArray(BENCHMARK_TARGETS)) {
+    // 2. Add historical BENCHMARK_TARGETS (past debris)
+    if (typeof BENCHMARK_TARGETS !== 'undefined' && Array.isArray(BENCHMARK_TARGETS)) {
       BENCHMARK_TARGETS.forEach((t, i) => {
         const id = t.object_id || t.target_id || `BM_TGT_${i+1}`;
-        if (!existingIds.has(id)) {
-          existingIds.add(id);
-          this.entireOceanMapState.allDetections.push({
+        if (!existingMap.has(id)) {
+          existingMap.set(id, {
             ...t,
             target_id: id,
             survey_id: t.survey_id || 'HISTORICAL_BENCHMARK',
@@ -1043,6 +1034,78 @@ class GlobalOceanGISMap {
         }
       });
     }
+
+    // 3. Load persistent LocalStorage GIS Spatial DB (stored past & future user scan inputs)
+    try {
+      const storedJson = localStorage.getItem('sea_sentinel_gis_spatial_db');
+      if (storedJson) {
+        const storedList = JSON.parse(storedJson);
+        if (Array.isArray(storedList)) {
+          storedList.forEach(t => {
+            const id = t.target_id || t.object_id;
+            if (id) existingMap.set(id, t);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[GlobalOceanGISMap] Failed loading stored GIS spatial database:", e);
+    }
+
+    // 4. Add live app targets from window.app.targets if available
+    if (window.app && Array.isArray(window.app.targets)) {
+      window.app.targets.forEach((t, i) => {
+        const id = t.target_id || t.object_id || `LIVE_TGT_${i+1}`;
+        existingMap.set(id, {
+          ...t,
+          target_id: id,
+          survey_id: t.survey_id || 'CURRENT_SCAN',
+          is_recent: true
+        });
+      });
+    }
+
+    const combined = Array.from(existingMap.values());
+    this.entireOceanMapState.allDetections = combined;
+
+    // Persist consolidated spatial database to LocalStorage so all past, present & future debris locations are retained
+    try {
+      localStorage.setItem('sea_sentinel_gis_spatial_db', JSON.stringify(combined));
+    } catch (e) {
+      console.warn("[GlobalOceanGISMap] Failed to persist GIS database:", e);
+    }
+  }
+
+  addDebrisTarget(targetData) {
+    if (!targetData) return;
+    const id = targetData.target_id || targetData.object_id || `TGT_${Date.now()}`;
+    const formattedTarget = {
+      ...targetData,
+      target_id: id,
+      survey_id: targetData.survey_id || 'LIVE_INPUT_' + new Date().toISOString().slice(0, 10),
+      detected_at: targetData.detected_at || targetData.timestamp || new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC',
+      is_recent: true
+    };
+
+    const existingIndex = this.entireOceanMapState.allDetections.findIndex(t => (t.target_id || t.object_id) === id);
+    if (existingIndex >= 0) {
+      this.entireOceanMapState.allDetections[existingIndex] = formattedTarget;
+    } else {
+      this.entireOceanMapState.allDetections.push(formattedTarget);
+    }
+
+    try {
+      localStorage.setItem('sea_sentinel_gis_spatial_db', JSON.stringify(this.entireOceanMapState.allDetections));
+    } catch (e) {
+      console.warn("[GlobalOceanGISMap] LocalStorage save error:", e);
+    }
+
+    // Update survey list if needed
+    if (formattedTarget.survey_id && !this.entireOceanMapState.allSurveys.includes(formattedTarget.survey_id)) {
+      this.entireOceanMapState.allSurveys.push(formattedTarget.survey_id);
+    }
+
+    this.applyFiltersAndRender();
+    this.updateStatisticsBar();
   }
 
   updateStatisticsBar(stats = {}) {
@@ -1447,6 +1510,37 @@ class GlobalOceanGISMap {
     if (this.map) this.map.invalidateSize();
   }
 }
+
+// Global helper to register & locate any GIS debris target across past, present, and future scans
+window.registerGisDebrisTarget = function(targetData) {
+  if (!targetData) return;
+  try {
+    const existingJson = localStorage.getItem('sea_sentinel_gis_spatial_db');
+    let stored = existingJson ? JSON.parse(existingJson) : [];
+    if (!Array.isArray(stored)) stored = [];
+    
+    const id = targetData.target_id || targetData.object_id || `TGT_${Date.now()}`;
+    const idx = stored.findIndex(t => (t.target_id || t.object_id) === id);
+    const item = {
+      ...targetData,
+      target_id: id,
+      survey_id: targetData.survey_id || 'GIS_INPUT',
+      is_recent: true
+    };
+    if (idx >= 0) {
+      stored[idx] = item;
+    } else {
+      stored.push(item);
+    }
+    localStorage.setItem('sea_sentinel_gis_spatial_db', JSON.stringify(stored));
+  } catch (e) {
+    console.warn("registerGisDebrisTarget LocalStorage error:", e);
+  }
+
+  if (window.entireOceanMap && typeof window.entireOceanMap.addDebrisTarget === 'function') {
+    window.entireOceanMap.addDebrisTarget(targetData);
+  }
+};
 
 // =====================================================================
 // Global Exports & Backward Compatibility Aliases
