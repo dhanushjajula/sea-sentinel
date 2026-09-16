@@ -242,7 +242,7 @@ class CurrentInputGISMap {
 
   async _loadHabitatLayers() {
     try {
-      const res = await fetch("http://localhost:8000/api/gis/layers");
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/layers`);
       if (!res.ok) return;
       const data = await res.json();
       const layers = data.layers || {};
@@ -776,7 +776,7 @@ class GlobalOceanGISMap {
 
   async _loadHabitatLayers() {
     try {
-      const res = await fetch("http://localhost:8000/api/gis/layers");
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/layers`);
       if (!res.ok) return;
       const data = await res.json();
       const layers = data.layers || {};
@@ -933,13 +933,14 @@ class GlobalOceanGISMap {
       const authHeaders = (window.authManager && typeof window.authManager.getAuthHeader === 'function')
         ? window.authManager.getAuthHeader()
         : {};
-      const url = `http://localhost:8000/api/gis/map-data?min_confidence=0.0&class_filter=all`;
+      const apiBase = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000');
+      const url = `${apiBase}/api/gis/map-data?min_confidence=0.0&class_filter=all`;
       const res = await fetch(url, { headers: authHeaders });
       if (res.status === 403) {
         console.warn("[GlobalOceanGISMap] 403 Forbidden: Admin privileges required to load entire ocean dataset.");
         return;
       }
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
       this.entireOceanMapState.allDetections = data.targets || [];
@@ -987,6 +988,24 @@ class GlobalOceanGISMap {
       }
     } catch (err) {
       console.warn("[GlobalOceanGISMap] Load dataset warning:", err);
+      // Edge-mode fallback: populate with benchmark targets if available
+      if (this.entireOceanMapState.allDetections.length === 0 && typeof BENCHMARK_TARGETS !== 'undefined') {
+        console.info("[GlobalOceanGISMap] Using BENCHMARK_TARGETS fallback for Edge mode.");
+        this.entireOceanMapState.allDetections = BENCHMARK_TARGETS.map((t, i) => ({
+          ...t,
+          target_id: t.object_id || `TGT_${String(i+1).padStart(3,'0')}`,
+          survey_id: t.survey_id || 'EDGE_FALLBACK',
+          is_recent: true
+        }));
+        const surveySet = new Set();
+        this.entireOceanMapState.allDetections.forEach(t => { if (t.survey_id) surveySet.add(t.survey_id); });
+        this.entireOceanMapState.allSurveys = Array.from(surveySet);
+        this.applyFiltersAndRender();
+        this.updateStatisticsBar({});
+        if (window.app && window.app.showToast) {
+          window.app.showToast({ type: "warning", title: "Edge Mode Map", message: "Showing cached benchmark debris data — backend is unreachable." });
+        }
+      }
     }
   }
 
@@ -1352,7 +1371,7 @@ class GlobalOceanGISMap {
       const btn = document.getElementById('btnRecalcClustersGlobal');
       if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Clustering...';
 
-      const res = await fetch('http://localhost:8000/api/gis/cluster/recalculate?epsilon_meters=50.0&min_samples=2', { method: 'POST' });
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/cluster/recalculate?epsilon_meters=50.0&min_samples=2`, { method: 'POST' });
       if (res.ok) {
         if (window.app && window.app.showToast) {
           window.app.showToast({ type: "success", title: "DBSCAN Re-clustered", message: "Spatial clusters updated across global ocean database." });
@@ -1369,7 +1388,7 @@ class GlobalOceanGISMap {
 
   async exportData(format = 'geojson') {
     try {
-      const res = await fetch(`http://localhost:8000/api/gis/export/${format}`);
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/export/${format}`);
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

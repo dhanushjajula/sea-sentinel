@@ -129,7 +129,7 @@ class AuthManager {
 
   async login(email, password) {
     try {
-      const res = await fetch("http://localhost:8000/api/auth/login", {
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -167,7 +167,7 @@ class AuthManager {
   async switchRole(targetRole) {
     const role = targetRole.toUpperCase() === "ADMIN" ? "ADMIN" : "USER";
     try {
-      const res = await fetch("http://localhost:8000/api/auth/switch-role", {
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/auth/switch-role`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

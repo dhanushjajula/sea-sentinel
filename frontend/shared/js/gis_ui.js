@@ -166,7 +166,7 @@ class GISUIController {
         if (!format) return;
         const fmt = format.trim().toLowerCase();
         try {
-          const res = await fetch(`http://localhost:8000/api/gis/export/${fmt}`);
+          const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/export/${fmt}`);
           if (!res.ok) throw new Error("Export failed");
           const blob = await res.blob();
           const url = window.URL.createObjectURL(blob);
@@ -273,7 +273,7 @@ class GISUIController {
     this.reviewingTargetId = targetId;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/gis/target/${targetId}`);
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/target/${targetId}`);
       if (!res.ok) throw new Error("Target not found");
       const data = await res.json();
       const target = data.target || {};
@@ -319,7 +319,7 @@ class GISUIController {
         reviewer_name: 'Hydrographic Operator'
       };
 
-      const res = await fetch(`http://localhost:8000/api/gis/target/${targetId}/review`, {
+      const res = await fetch(`${(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000')}/api/gis/target/${targetId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
