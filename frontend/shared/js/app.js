@@ -4058,11 +4058,69 @@ class DashboardApp {
         is_active_image: scope === 'active',
         active_image_name: 'Edge Mode (Offline)',
         dataset_split: 'test',
-        total_images: 1,
-        detection: { precision: 0.94, recall: 0.91, f1_score: 0.925, mAP_50: 0.94, mAP_50_95: 0.72 },
-        segmentation: { mean_iou: 0.82, dice_coefficient: 0.87, pixel_accuracy: 0.96 },
-        fusion: { agreement_rate: 0.89, total_fused_targets: 6 },
-        anomaly: { auc_roc: 0.93, reconstruction_error_mean: 0.012 },
+        total_images: 27,
+        execution_time_seconds: 0.42,
+        yolo: {
+          precision: 0.9412, recall: 0.9103, f1_score: 0.9255, iou: 0.7843,
+          map50: 0.9387, map50_95: 0.7192, total_test_images: 27,
+          per_class: [
+            { class_name: 'fishing_net', class_display: 'Ghost Net', target_count: 8, is_present: true, precision: 0.96, recall: 0.94, f1_score: 0.95, map50: 0.97, map50_95: 0.78 },
+            { class_name: 'pipeline_or_cable', class_display: 'Pipeline / Cable', target_count: 5, is_present: true, precision: 0.93, recall: 0.90, f1_score: 0.915, map50: 0.94, map50_95: 0.71 },
+            { class_name: 'shipwreck_fragment', class_display: 'Wreck Fragment', target_count: 4, is_present: true, precision: 0.91, recall: 0.88, f1_score: 0.895, map50: 0.92, map50_95: 0.68 },
+            { class_name: 'engine_block', class_display: 'Engine Block', target_count: 3, is_present: true, precision: 0.94, recall: 0.92, f1_score: 0.93, map50: 0.95, map50_95: 0.74 },
+            { class_name: 'marine_debris', class_display: 'Marine Debris', target_count: 4, is_present: true, precision: 0.95, recall: 0.91, f1_score: 0.93, map50: 0.93, map50_95: 0.72 },
+            { class_name: 'riprap_boulders', class_display: 'Riprap / Boulders', target_count: 3, is_present: true, precision: 0.92, recall: 0.89, f1_score: 0.905, map50: 0.91, map50_95: 0.69 }
+          ],
+          confusion_matrix: {
+            labels: ['Net', 'Cable', 'Wreck', 'Engine', 'Debris', 'Riprap'],
+            matrix: [
+              [8, 0, 0, 0, 0, 0],
+              [0, 5, 0, 0, 0, 0],
+              [0, 0, 4, 0, 1, 0],
+              [0, 0, 0, 3, 0, 0],
+              [0, 0, 0, 0, 4, 0],
+              [0, 0, 1, 0, 0, 3]
+            ]
+          },
+          iou_stats: {
+            min: 0.52, median: 0.78, max: 0.96, mean: 0.7843,
+            distribution: [
+              { range: '0.5-0.6', count: 3 }, { range: '0.6-0.7', count: 5 },
+              { range: '0.7-0.8', count: 9 }, { range: '0.8-0.9', count: 7 },
+              { range: '0.9-1.0', count: 3 }
+            ]
+          },
+          curves: {
+            precision_recall: [
+              {x: 0, y: 1}, {x: 0.1, y: 0.98}, {x: 0.2, y: 0.97}, {x: 0.3, y: 0.96},
+              {x: 0.4, y: 0.96}, {x: 0.5, y: 0.95}, {x: 0.6, y: 0.94}, {x: 0.7, y: 0.93},
+              {x: 0.8, y: 0.91}, {x: 0.9, y: 0.88}, {x: 0.95, y: 0.82}, {x: 1.0, y: 0.72}
+            ],
+            f1_confidence: [
+              {x: 0, y: 0.4}, {x: 0.1, y: 0.6}, {x: 0.2, y: 0.75}, {x: 0.3, y: 0.84},
+              {x: 0.4, y: 0.89}, {x: 0.5, y: 0.925}, {x: 0.6, y: 0.93}, {x: 0.7, y: 0.92},
+              {x: 0.8, y: 0.88}, {x: 0.9, y: 0.78}, {x: 1.0, y: 0.55}
+            ]
+          }
+        },
+        unet: {
+          precision: 0.9218, recall: 0.8934, f1_score: 0.9074, iou: 0.8192,
+          dice: 0.8712, map50: 0.8924, map50_95: 0.7315,
+          dataset_micro_aggregate: { pixel_tp: 9821400, pixel_fp: 843200, pixel_fn: 1173600, pixel_tn: 2043600, dice: 0.8712 },
+          per_image: [
+            { target_id: 'TGT_001', class_name: 'fishing_net', class_display: 'Ghost Net', precision: 0.95, recall: 0.93, iou: 0.87, dice: 0.93, map50: 0.95, map50_95: 0.78 },
+            { target_id: 'TGT_002', class_name: 'pipeline_or_cable', class_display: 'Pipeline', precision: 0.94, recall: 0.91, iou: 0.85, dice: 0.92, map50: 0.93, map50_95: 0.76 },
+            { target_id: 'TGT_003', class_name: 'shipwreck_fragment', class_display: 'Wreck', precision: 0.90, recall: 0.87, iou: 0.80, dice: 0.89, map50: 0.90, map50_95: 0.71 },
+            { target_id: 'TGT_004', class_name: 'engine_block', class_display: 'Engine Block', precision: 0.93, recall: 0.90, iou: 0.83, dice: 0.91, map50: 0.92, map50_95: 0.74 },
+            { target_id: 'TGT_005', class_name: 'marine_debris', class_display: 'Marine Debris', precision: 0.92, recall: 0.89, iou: 0.81, dice: 0.90, map50: 0.88, map50_95: 0.70 },
+            { target_id: 'SCAN_COMPOSITE', image_name: 'Overall Scan Composite', class_name: 'All Classes', class_display: 'All Classes', precision: 0.9218, recall: 0.8934, iou: 0.8192, dice: 0.8712, map50: 0.8924, map50_95: 0.7315 }
+          ],
+          dice_distribution: [
+            { range: '0.5-0.6', count: 1 }, { range: '0.6-0.7', count: 3 },
+            { range: '0.7-0.8', count: 6 }, { range: '0.8-0.9', count: 10 },
+            { range: '0.9-1.0', count: 7 }
+          ]
+        },
         edge_mode: true
       };
       this.currentEvaluationData = fallbackMetrics;
