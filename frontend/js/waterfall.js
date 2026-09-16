@@ -342,29 +342,44 @@ class WaterfallViewer {
   }
 
   _getPolygonCanvasCoords(t, w, h) {
-    const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
-    const imgH = (t.image_dimensions && t.image_dimensions.height) || (this.rawImage ? this.rawImage.naturalHeight : h) || h;
-    const sx = w / imgW;
-    const sy = h / imgH;
+    const coords = this._getTargetCanvasCoords(t, w, h);
+    const { x1, y1, bw, bh } = coords;
 
     if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
-      return t.norm_polygon.map(pt => ({ x: pt[0] * w, y: pt[1] * h }));
+      const isNorm = t.norm_polygon.every(pt => pt[0] <= 1.05 && pt[1] <= 1.05);
+      if (isNorm) {
+        return t.norm_polygon.map(pt => ({
+          x: Math.max(0, Math.min(w, pt[0] * w)),
+          y: Math.max(0, Math.min(h, pt[1] * h))
+        }));
+      }
     }
 
     if (t.polygon && Array.isArray(t.polygon) && t.polygon.length >= 3) {
-      return t.polygon.map(pt => ({ x: pt[0] * sx, y: pt[1] * sy }));
+      const isNorm = t.polygon.every(pt => pt[0] <= 1.05 && pt[1] <= 1.05);
+      if (isNorm) {
+        return t.polygon.map(pt => ({
+          x: Math.max(0, Math.min(w, pt[0] * w)),
+          y: Math.max(0, Math.min(h, pt[1] * h))
+        }));
+      }
+      const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
+      const imgH = (t.image_dimensions && t.image_dimensions.height) || (this.rawImage ? this.rawImage.naturalHeight : h) || h;
+      return t.polygon.map(pt => ({
+        x: Math.max(0, Math.min(w, (pt[0] / imgW) * w)),
+        y: Math.max(0, Math.min(h, (pt[1] / imgH) * h))
+      }));
     }
 
-    const coords = this._getTargetCanvasCoords(t, w, h);
-    const { x1, y1, bw, bh } = coords;
     return [
-      { x: x1 + bw * 0.15, y: y1 + bh * 0.20 },
-      { x: x1 + bw * 0.50, y: y1 + bh * 0.08 },
-      { x: x1 + bw * 0.85, y: y1 + bh * 0.22 },
-      { x: x1 + bw * 0.95, y: y1 + bh * 0.60 },
-      { x: x1 + bw * 0.80, y: y1 + bh * 0.90 },
-      { x: x1 + bw * 0.45, y: y1 + bh * 0.95 },
-      { x: x1 + bw * 0.10, y: y1 + bh * 0.75 }
+      { x: x1 + bw * 0.18, y: y1 + bh * 0.06 },
+      { x: x1 + bw * 0.72, y: y1 + bh * 0.08 },
+      { x: x1 + bw * 0.96, y: y1 + bh * 0.38 },
+      { x: x1 + bw * 0.90, y: y1 + bh * 0.82 },
+      { x: x1 + bw * 0.58, y: y1 + bh * 0.96 },
+      { x: x1 + bw * 0.20, y: y1 + bh * 0.92 },
+      { x: x1 + bw * 0.04, y: y1 + bh * 0.62 },
+      { x: x1 + bw * 0.06, y: y1 + bh * 0.25 }
     ];
   }
 
@@ -429,7 +444,7 @@ class WaterfallViewer {
           ctx.lineTo(poly[i].x, poly[i].y);
         }
         ctx.closePath();
-        ctx.fillStyle = isSelected ? "rgba(0, 255, 128, 0.35)" : "rgba(0, 240, 255, 0.22)";
+        ctx.fillStyle = isSelected ? "rgba(0, 255, 128, 0.32)" : "rgba(0, 240, 255, 0.24)";
         ctx.fill();
         ctx.restore();
       }
@@ -437,33 +452,26 @@ class WaterfallViewer {
       // (B) U-Net Crisp Perimeter Contour Lines & Keypoint Node Dots
       if (this.layers.unet) {
         ctx.save();
-        const colors = ["#00f0ff", "#d946ef", "#00e676", "#ff9800", "#38bdf8"];
-        for (let i = 0; i < poly.length; i++) {
-          const p1 = poly[i];
-          const p2 = poly[(i + 1) % poly.length];
-          const segColor = colors[i % colors.length];
-
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.lineWidth = isSelected ? 3.2 : 2.4;
-          ctx.strokeStyle = segColor;
-          ctx.shadowColor = segColor;
-          ctx.shadowBlur = 6;
-          ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo(poly[i].x, poly[i].y);
         }
+        ctx.closePath();
+        ctx.lineWidth = isSelected ? 3.0 : 2.2;
+        ctx.strokeStyle = isSelected ? "#00e676" : "#00f0ff";
+        ctx.shadowColor = isSelected ? "#00e676" : "#00f0ff";
+        ctx.shadowBlur = isSelected ? 12 : 6;
+        ctx.stroke();
 
-        // Draw U-Net Keypoint / Vertex Node Dots
-        const nodeColors = ["#00e676", "#00f0ff", "#e040fb", "#ff9800", "#38bdf8"];
+        // Draw clean vertex dots
         for (let i = 0; i < poly.length; i++) {
           const pt = poly[i];
-          const nCol = nodeColors[i % nodeColors.length];
-
           ctx.beginPath();
-          ctx.arc(pt.x, pt.y, isSelected ? 5.2 : 4.2, 0, Math.PI * 2);
-          ctx.fillStyle = nCol;
+          ctx.arc(pt.x, pt.y, isSelected ? 4.5 : 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = isSelected ? "#00e676" : "#00f0ff";
           ctx.fill();
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 1.2;
           ctx.strokeStyle = "#ffffff";
           ctx.stroke();
         }
