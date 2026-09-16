@@ -1,0 +1,21 @@
+# render.yaml - Render Blueprint for Sea Sentinel
+# Deploys backend (FastAPI + static frontend) as a single Web Service.
+# The backend mounts the frontend/ directory as static files, serving everything from one service.
+
+services:
+  - type: web
+    name: sea-sentinel-backend3
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r backend/requirements-render.txt
+    startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: PORT
+        value: "10000"
+      - key: SEA_SENTINEL_ENV
+        value: "production"
+      - key: JWT_SECRET_KEY
+        value: "sea_sentinel_render_prod_key_2026"

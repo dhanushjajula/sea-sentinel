@@ -47,6 +47,7 @@ backend/datasets/raw/*
 *.zip
 *.parquet
 *.pt
+!backend/yolo11n.pt
 *.pth
 *.onnx
 models/checkpoints/*.pt
