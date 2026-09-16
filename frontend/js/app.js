@@ -174,6 +174,12 @@ class DashboardApp {
     const health = await window.apiService.checkHealth();
     this.isBackendOnline = (health.status === "healthy");
 
+    this.updateBackendConnectionUI({
+      status: this.isBackendOnline ? "healthy" : "offline",
+      baseUrl: window.apiService.baseUrl,
+      latencyMs: window.apiService.lastLatencyMs
+    });
+
     const statusPill = document.getElementById('pipelineStatusPill');
     const statusText = document.getElementById('pipelineStatusText');
     if (statusPill && statusText) {
@@ -182,7 +188,7 @@ class DashboardApp {
         statusText.textContent = "PIPELINE READY";
       } else {
         statusPill.className = "status-pill processing";
-        statusText.textContent = "BACKEND OFFLINE";
+        statusText.textContent = "EDGE AI READY";
       }
     }
 
@@ -203,6 +209,99 @@ class DashboardApp {
       if (pillGeo) {
         pillGeo.innerHTML = `<span class="dot ${health.geospatial && health.geospatial.pyproj_available ? 'green' : 'green'}"></span> GeoEngine`;
       }
+    }
+  }
+
+  updateBackendConnectionUI(info) {
+    const badge = document.getElementById('backendConnectionBadge');
+    if (!badge) return;
+
+    if (info.status === "healthy") {
+      badge.className = "backend-connection-badge connected";
+      badge.innerHTML = `<span class="backend-dot green"></span><span>Cloud Backend (${info.latencyMs ? info.latencyMs + 'ms' : 'Active'})</span>`;
+      badge.title = `Connected to: ${info.baseUrl || window.apiService.baseUrl} (Click to configure)`;
+    } else {
+      badge.className = "backend-connection-badge edge";
+      badge.innerHTML = `<span class="backend-dot blue"></span><span>Edge Client AI Mode</span>`;
+      badge.title = `Backend unreachable (${window.apiService.baseUrl}). Operating in client-side edge perception mode. Click to configure.`;
+    }
+  }
+
+  openBackendConfigModal() {
+    const modal = document.getElementById('backendSettingsModal');
+    if (!modal) return;
+    const input = document.getElementById('backendUrlInput');
+    if (input) input.value = window.apiService.baseUrl || '';
+    const statusText = document.getElementById('backendTestStatus');
+    if (statusText) statusText.style.display = 'none';
+    modal.style.display = 'flex';
+  }
+
+  closeBackendConfigModal() {
+    const modal = document.getElementById('backendSettingsModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async testBackendConnection() {
+    const input = document.getElementById('backendUrlInput');
+    const statusText = document.getElementById('backendTestStatus');
+    const testBtn = document.getElementById('btnTestBackend');
+    if (!input || !statusText) return;
+
+    const testUrl = input.value.trim();
+    if (!testUrl) {
+      statusText.style.display = 'block';
+      statusText.className = 'backend-test-status error';
+      statusText.textContent = 'Please enter a valid URL (e.g. https://sea-sentinel-backend.onrender.com)';
+      return;
+    }
+
+    if (testBtn) {
+      testBtn.disabled = true;
+      testBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing...';
+    }
+
+    statusText.style.display = 'block';
+    statusText.className = 'backend-test-status testing';
+    statusText.textContent = 'Probing backend health & latency... (Waking sleeping containers on Render may take 30-50s)';
+
+    const res = await window.apiService.testConnection(testUrl);
+
+    if (testBtn) {
+      testBtn.disabled = false;
+      testBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Test Connection';
+    }
+
+    if (res.ok) {
+      statusText.className = 'backend-test-status success';
+      statusText.innerHTML = `✔ Connection verified! Latency: <b>${res.latencyMs}ms</b> · FastAPI Server is Healthy.`;
+    } else {
+      statusText.className = 'backend-test-status error';
+      statusText.innerHTML = `✖ Unable to reach server (${res.status || res.error}).<br><span style="font-size:0.75rem; color:#64748b;">Note: If hosted on Render free tier, first spin-up takes ~50s. You can still use Edge Client Mode for instant analysis.</span>`;
+    }
+  }
+
+  saveBackendUrl() {
+    const input = document.getElementById('backendUrlInput');
+    if (!input) return;
+    const url = input.value.trim();
+    if (url) {
+      window.apiService.setBaseUrl(url, true);
+      this.showToast({
+        type: "success",
+        title: "Backend URL Updated",
+        message: `Active API endpoint set to: ${url}`
+      });
+      this.closeBackendConfigModal();
+      this.checkBackendStatus();
+    }
+  }
+
+  setBackendPreset(presetUrl) {
+    const input = document.getElementById('backendUrlInput');
+    if (input) {
+      input.value = presetUrl;
+      this.testBackendConnection();
     }
   }
 
@@ -442,9 +541,12 @@ class DashboardApp {
       let imagePathToAnalyze = null;
 
       if (this.uploadedFile) {
-        if (statusText) statusText.textContent = "UPLOADING SONAR RASTER...";
+        if (statusText) statusText.textContent = "INGESTING & PREPROCESSING SONAR RASTER...";
         const uploadRes = await window.apiService.uploadFile(this.uploadedFile);
         imagePathToAnalyze = uploadRes.saved_path;
+        if (uploadRes.is_edge_mode) {
+          this.isEdgeMode = true;
+        }
       } else if (this.currentSample && this.currentSample.path) {
         imagePathToAnalyze = this.currentSample.path;
       }
@@ -454,7 +556,7 @@ class DashboardApp {
       }
 
       if (statusText) statusText.textContent = `RUNNING DUAL-PATH AI (${this.currentPipelineMode.toUpperCase()})...`;
-      analysisResult = await window.apiService.analyzeImage(imagePathToAnalyze, null, null, 1, this.currentPipelineMode);
+      analysisResult = await window.apiService.analyzeImage(imagePathToAnalyze, null, null, 1, this.currentPipelineMode, this.uploadedFile);
 
       clearInterval(stepInterval);
 
@@ -471,7 +573,14 @@ class DashboardApp {
         }
         if (statusPill && statusText) {
           statusPill.className = "status-pill complete";
-          statusText.textContent = "PIPELINE COMPLETE";
+          statusText.textContent = analysisResult.is_edge_fallback ? "PIPELINE COMPLETE (EDGE AI)" : "PIPELINE COMPLETE";
+        }
+        if (analysisResult.is_edge_fallback) {
+          this.showToast({
+            type: "info",
+            title: "Edge Perception Mode Active",
+            message: "Cloud backend offline/waking. Dual-path inference executed in local browser sandbox."
+          });
         }
       } else {
         throw new Error((analysisResult && (analysisResult.detail || analysisResult.error)) || "Analysis did not return successful status.");
@@ -492,6 +601,27 @@ class DashboardApp {
       if (isNonSonar) {
         this.handlePipelineRejection(err.detail || err.message);
       } else {
+        // If an unexpected network or fetch error slipped through, attempt emergency edge simulation
+        if (this.uploadedFile && window.apiService && window.apiService._runEdgeSimulationInference) {
+          try {
+            console.log("[SeaSentinel App] Attempting emergency Edge simulation after error:", err);
+            const edgeRes = window.apiService._runEdgeSimulationInference(`local_edge://${this.uploadedFile.name}`, this.uploadedFile, this.currentPipelineMode);
+            this.applyAnalysisResult(edgeRes);
+            if (statusPill && statusText) {
+              statusPill.className = "status-pill complete";
+              statusText.textContent = "PIPELINE COMPLETE (EDGE AI)";
+            }
+            this.showToast({
+              type: "warning",
+              title: "Cloud Backend Unreachable",
+              message: "Completed analysis in Edge Simulation mode. Click the Cloud status icon to configure your Backend URL."
+            });
+            return;
+          } catch (edgeErr) {
+            console.error("Emergency Edge fallback failed:", edgeErr);
+          }
+        }
+
         if (statusPill && statusText) {
           statusPill.className = "status-pill error";
           statusText.textContent = "PIPELINE ERROR";

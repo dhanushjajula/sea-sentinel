@@ -270,6 +270,12 @@
             <span id="edgeOfflineText">OFFLINE (EDGE)</span>
           </div>
 
+          <!-- Backend Connection & API Endpoint Indicator -->
+          <button class="backend-connection-badge" id="backendConnectionBadge" title="Click to view & configure Backend API URL" onclick="if(window.app && window.app.openBackendConfigModal) window.app.openBackendConfigModal();">
+            <span class="backend-dot green"></span>
+            <span>Cloud Backend</span>
+          </button>
+
           <div class="status-pill complete" id="pipelineStatusPill" style="padding: 4px 10px; font-size: 0.72rem;">
             <span class="status-dot"></span>
             <span id="pipelineStatusText">STANDBY</span>
@@ -2093,6 +2099,66 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Backend API Settings & Cold Start Diagnostics Modal -->
+  <div class="modal-overlay" id="backendSettingsModal" style="display: none; align-items: center; justify-content: center; z-index: 100000; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px);">
+    <div class="modal-content" style="max-width: 520px; width: 92%; background: #ffffff; border-radius: 16px; padding: 28px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid #e2e8f0; position: relative;">
+      <button class="modal-close-btn" onclick="if(window.app && window.app.closeBackendConfigModal) window.app.closeBackendConfigModal();" style="position: absolute; top: 18px; right: 18px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #64748b;">&times;</button>
+      
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #0284c7, #059669); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">
+          <i class="fa-solid fa-server"></i>
+        </div>
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">Backend API Configuration</h2>
+          <p style="font-size: 0.76rem; color: #64748b; margin: 2px 0 0;">Configure FastAPI endpoint &amp; cold-start connection</p>
+        </div>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 0.78rem; color: #334155; line-height: 1.45;">
+        <i class="fa-solid fa-circle-info" style="color: #0284c7; margin-right: 4px;"></i>
+        <b>Render Free-Tier Notice:</b> When deployed on Render free tier, idle backend instances take <b>~50 seconds</b> to spin up on the first request. The frontend includes <b>Edge-First Client Fallback</b> so your sonar uploads and scans work instantly even while the server wakes up.
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 6px;">
+          Active Backend URL (FastAPI REST Endpoint)
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="backendUrlInput" placeholder="https://sea-sentinel-backend.onrender.com" style="flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.84rem; font-family: var(--font-mono); outline: none; transition: border-color 0.2s;" />
+          <button type="button" class="gis-btn" id="btnTestBackend" onclick="if(window.app) window.app.testBackendConnection();" style="padding: 0 14px; font-weight: 600; white-space: nowrap;">
+            <i class="fa-solid fa-plug"></i> Test
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Preset Buttons -->
+      <div style="margin-bottom: 14px;">
+        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; display: block; margin-bottom: 6px;">Quick Presets:</span>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="button" class="gis-btn" style="font-size: 0.72rem; padding: 4px 8px;" onclick="if(window.app) window.app.setBackendPreset('https://' + window.location.hostname.replace(/-frontend\d*/, '-backend'));">
+            <i class="fa-solid fa-cloud"></i> Render Paired Backend
+          </button>
+          <button type="button" class="gis-btn" style="font-size: 0.72rem; padding: 4px 8px;" onclick="if(window.app) window.app.setBackendPreset('http://localhost:8000');">
+            <i class="fa-solid fa-laptop-code"></i> Localhost:8000
+          </button>
+          <button type="button" class="gis-btn" style="font-size: 0.72rem; padding: 4px 8px;" onclick="if(window.app) window.app.setBackendPreset(window.location.origin);">
+            <i class="fa-solid fa-globe"></i> Same Origin
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Test Output Box -->
+      <div id="backendTestStatus" class="backend-test-status" style="display: none; padding: 10px 12px; border-radius: 8px; font-size: 0.78rem; margin-bottom: 16px;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; padding-top: 14px; border-top: 1px solid #f1f5f9;">
+        <button type="button" class="gis-btn" onclick="if(window.app) window.app.closeBackendConfigModal();" style="padding: 8px 16px;">Cancel</button>
+        <button type="button" class="btn-emerald" onclick="if(window.app) window.app.saveBackendUrl();" style="padding: 8px 18px; font-weight: 600;">
+          <i class="fa-solid fa-check"></i> Save &amp; Connect
+        </button>
+      </div>
     </div>
   </div>
 
