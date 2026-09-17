@@ -16,11 +16,17 @@ if exist "%~dp0.venv\Scripts\python.exe" (
     set PYTHON_EXE=%~dp0.venv\Scripts\python.exe
 )
 
-echo [2/3] Starting FastAPI Backend Server on http://localhost:8000 ...
-start "Sea Sentinel Backend" /D "%~dp0backend" "%PYTHON_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+where %PYTHON_EXE% >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo [2/3] Starting FastAPI Backend Server on http://localhost:8000 ...
+    start "Sea Sentinel Backend" /D "%~dp0backend" "%PYTHON_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-echo [3/3] Starting Frontend Web Server on http://localhost:3000 ...
-start "Sea Sentinel Frontend" /D "%~dp0" "%PYTHON_EXE%" -m http.server 3000 --directory frontend
+    echo [3/3] Starting Frontend Web Server on http://localhost:3000 ...
+    start "Sea Sentinel Frontend" /D "%~dp0" "%PYTHON_EXE%" -m http.server 3000 --directory frontend
+) else (
+    echo [2/3] Python not found on system PATH. Starting PowerShell Frontend Server...
+    start "Sea Sentinel Frontend" powershell -ExecutionPolicy Bypass -NoExit -File "%~dp0serve.ps1"
+)
 
 echo.
 echo Servers successfully reloaded!

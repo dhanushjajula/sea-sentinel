@@ -66,6 +66,25 @@ class WaterfallViewer {
     this.render();
   }
 
+  resize() {
+    if (!this.canvas) return;
+    const parent = this.canvas.parentElement;
+    if (parent) {
+      const rect = parent.getBoundingClientRect();
+      if (rect.width > 0) {
+        if (this.rawImage && this.rawImage.naturalWidth > 0) {
+          const aspect = this.rawImage.naturalHeight / this.rawImage.naturalWidth;
+          this.canvas.width = Math.min(1600, Math.max(800, Math.round(rect.width)));
+          this.canvas.height = Math.round(this.canvas.width * aspect);
+        } else {
+          this.canvas.width = Math.max(800, Math.round(rect.width));
+          this.canvas.height = Math.max(420, Math.round(rect.height || 420));
+        }
+      }
+    }
+    this.render();
+  }
+
   zoomAt(canvasX, canvasY, factor) {
     const newScale = Math.min(this.maxScale, Math.max(this.minScale, this.scale * factor));
     if (Math.abs(newScale - this.scale) < 0.001) return;
@@ -371,16 +390,39 @@ class WaterfallViewer {
       }));
     }
 
-    return [
-      { x: x1 + bw * 0.18, y: y1 + bh * 0.06 },
-      { x: x1 + bw * 0.72, y: y1 + bh * 0.08 },
-      { x: x1 + bw * 0.96, y: y1 + bh * 0.38 },
-      { x: x1 + bw * 0.90, y: y1 + bh * 0.82 },
-      { x: x1 + bw * 0.58, y: y1 + bh * 0.96 },
-      { x: x1 + bw * 0.20, y: y1 + bh * 0.92 },
-      { x: x1 + bw * 0.04, y: y1 + bh * 0.62 },
-      { x: x1 + bw * 0.06, y: y1 + bh * 0.25 }
-    ];
+    // High-fidelity multi-vertex organic morphological model (20 smooth clockwise points)
+    const cls = (t.class || t.class_name || "").toLowerCase();
+    const pts = [];
+    const numPts = 20;
+    const cx = x1 + bw * 0.5;
+    const cy = y1 + bh * 0.5;
+    const rx = bw * 0.46;
+    const ry = bh * 0.46;
+    const seed = (t.object_id ? t.object_id.charCodeAt(t.object_id.length - 1) : 42);
+
+    for (let i = 0; i < numPts; i++) {
+      const angle = (i / numPts) * Math.PI * 2;
+      let radMod = 1.0;
+      if (cls.includes("net") || cls.includes("gear")) {
+        radMod = 0.82 + 0.16 * Math.sin(angle * 3 + seed) + 0.10 * Math.cos(angle * 5 - seed * 0.7);
+      } else if (cls.includes("wreck") || cls.includes("ship")) {
+        const sinA = Math.sin(angle);
+        const bowTaper = (sinA < 0) ? (0.68 + 0.32 * (1 + sinA)) : 1.0;
+        radMod = (0.86 + 0.10 * Math.cos(angle * 2)) * bowTaper;
+      } else if (cls.includes("pipe") || cls.includes("cable")) {
+        radMod = 0.55 + 0.45 * Math.pow(Math.abs(Math.cos(angle)), 0.65);
+      } else if (cls.includes("engine") || cls.includes("block")) {
+        radMod = 0.86 + 0.11 * Math.cos(angle * 4);
+      } else if (cls.includes("riprap") || cls.includes("rock") || cls.includes("boulder")) {
+        radMod = 0.84 + 0.15 * Math.sin(angle * 4 + 1.2) + 0.08 * Math.cos(angle * 2);
+      } else {
+        radMod = 0.85 + 0.13 * Math.sin(angle * 3 + seed * 1.3) + 0.07 * Math.cos(angle * 4);
+      }
+      const px = Math.max(x1 + bw * 0.02, Math.min(x1 + bw * 0.98, cx + Math.cos(angle) * (rx * radMod)));
+      const py = Math.max(y1 + bh * 0.02, Math.min(y1 + bh * 0.98, cy + Math.sin(angle) * (ry * radMod)));
+      pts.push({ x: px, y: py });
+    }
+    return pts;
   }
 
   render() {
@@ -458,22 +500,24 @@ class WaterfallViewer {
           ctx.lineTo(poly[i].x, poly[i].y);
         }
         ctx.closePath();
-        ctx.lineWidth = isSelected ? 3.0 : 2.2;
+        ctx.lineWidth = isSelected ? 2.8 : 2.0;
         ctx.strokeStyle = isSelected ? "#00e676" : "#00f0ff";
         ctx.shadowColor = isSelected ? "#00e676" : "#00f0ff";
         ctx.shadowBlur = isSelected ? 12 : 6;
         ctx.stroke();
 
-        // Draw clean vertex dots
-        for (let i = 0; i < poly.length; i++) {
-          const pt = poly[i];
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, isSelected ? 4.5 : 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = isSelected ? "#00e676" : "#00f0ff";
-          ctx.fill();
-          ctx.lineWidth = 1.2;
-          ctx.strokeStyle = "#ffffff";
-          ctx.stroke();
+        // Draw clean subtle vertex dots only when target is selected for inspection
+        if (isSelected) {
+          for (let i = 0; i < poly.length; i += 2) {
+            const pt = poly[i];
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 3.2, 0, Math.PI * 2);
+            ctx.fillStyle = "#00e676";
+            ctx.fill();
+            ctx.lineWidth = 1.0;
+            ctx.strokeStyle = "#ffffff";
+            ctx.stroke();
+          }
         }
         ctx.restore();
       }
@@ -497,13 +541,13 @@ class WaterfallViewer {
         ctx.shadowBlur = isSelected ? 16 : 8;
         ctx.strokeRect(x1, y1, bw, bh);
 
-        // Corner brackets
+        // Corner brackets (Strict 90-degree corner brackets, no diagonal lines)
         const cLen = Math.min(12, bw * 0.22, bh * 0.22);
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(x1, y1 + cLen); ctx.lineTo(x1, y1); ctx.lineTo(x1 + cLen, y1);
         ctx.moveTo(x1 + bw - cLen, y1); ctx.lineTo(x1 + bw, y1); ctx.lineTo(x1 + bw, y1 + cLen);
-        ctx.moveTo(x1 + bh - cLen, y1); ctx.lineTo(x1, y1 + bh); ctx.lineTo(x1 + cLen, y1 + bh);
+        ctx.moveTo(x1, y1 + bh - cLen); ctx.lineTo(x1, y1 + bh); ctx.lineTo(x1 + cLen, y1 + bh);
         ctx.moveTo(x1 + bw - cLen, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh - cLen);
         ctx.stroke();
 

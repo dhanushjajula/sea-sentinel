@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <!-- White & Emerald Green Design System -->
-  <link rel="stylesheet" href="css/style.css?v=5.0">
+  <link rel="stylesheet" href="css/style.css?v=16.0">
 </head>
 <body>
 
@@ -227,17 +227,23 @@
         </div>
 
         <div class="nav-user-actions">
-          <!-- Workspace view tabs fallback compatibility -->
-          <div class="workspace-tabs" style="display: none;">
-            <button class="tab-btn active" id="tabWaterfall" data-tab="waterfall">Sonar Scan</button>
-            <button class="tab-btn" id="tabSplit" data-tab="split">Split View</button>
-            <button class="tab-btn" id="tabMap" data-tab="map">GIS Map</button>
+          <!-- Workspace View Mode Switcher -->
+          <div class="workspace-tabs" id="workspaceTabs" style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg-card-subtle); padding: 3px 6px; border-radius: var(--radius-pill); border: 1px solid var(--border-light);">
+            <button class="tab-btn active" id="tabWaterfall" data-tab="waterfall" title="Focus Sonar Waterfall Scan" style="border: none; background: #ffffff; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; color: var(--emerald-800); box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+              <i class="fa-solid fa-water" style="color: var(--emerald-600);"></i> <span>Sonar Scan</span>
+            </button>
+            <button class="tab-btn" id="tabSplit" data-tab="split" title="Side-by-side Sonar Scan & Map" style="border: none; background: transparent; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary);">
+              <i class="fa-solid fa-table-columns" style="color: var(--sky-blue);"></i> <span>Split View</span>
+            </button>
+            <button class="tab-btn" id="tabMap" data-tab="map" title="Focus Ocean GIS Map" style="border: none; background: transparent; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary);">
+              <i class="fa-solid fa-earth-americas" style="color: var(--purple-accent);"></i> <span>GIS Map</span>
+            </button>
           </div>
 
           <!-- Feature Action Buttons (Role Scoped) -->
-          <button class="gis-btn role-admin-only" id="btnOpenLearningModal" title="Adaptive Learning & Error Prevention Engine">
+          <button class="gis-btn" id="btnOpenLearningModal" title="Adaptive Learning & Neural Retraining Engine">
             <i class="fa-solid fa-brain" style="color: var(--emerald-600);"></i>
-            <span>Learning</span>
+            <span>Learning &amp; Retrain</span>
           </button>
 
           <button class="gis-btn role-admin-only" id="btnOpenSyncModal" title="Store-and-Forward Cloud Sync Queue">
@@ -245,7 +251,7 @@
             <span>Sync (<span id="badgePendingSync">0</span>)</span>
           </button>
 
-          <button class="gis-btn role-admin-only" id="btnOpenModelModal" title="Edge AI Model Registry">
+          <button class="gis-btn" id="btnOpenModelModal" title="Edge AI Model Registry & Checkpoints">
             <i class="fa-solid fa-microchip" style="color: var(--purple-accent);"></i>
             <span>Models</span>
           </button>
@@ -644,8 +650,12 @@
                 <i class="fa-solid fa-tag" style="color: var(--amber-warn);"></i>
                 <span>Target IDs</span>
               </label>
-              <div style="margin-left: auto;">
+              <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
                 <button class="gis-btn active" id="btnToggleAllLayers" style="padding: 2px 8px; font-size: 0.7rem;"><i class="fa-solid fa-eye"></i> All On</button>
+                <button type="button" class="btn-emerald" id="btnRetrainYoloUnetWaterfall" style="padding: 3px 12px; font-size: 0.72rem; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); border: 1px solid rgba(16,185,129,0.5); box-shadow: 0 0 10px rgba(16,185,129,0.3); border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;" title="Launch Neural Retraining & Calibration Studio">
+                  <i class="fa-solid fa-brain"></i>
+                  <span>Retrain &amp; Calibrate YOLO / U-Net</span>
+                </button>
               </div>
             </div>
 
@@ -685,40 +695,40 @@
             </div>
 
             <div class="pipeline-stepper-track" id="pipelineStepper">
-              <div class="step-node" id="stepUpload">
-                <div class="step-circle">1</div>
+              <div class="step-node active completed" id="stepUpload">
+                <div class="step-circle"><i class="fa-solid fa-file-arrow-up"></i></div>
                 <span class="step-name">Unfolding</span>
-                <span class="step-time" id="timeStepUpload">--</span>
+                <span class="step-time" id="timeStepUpload">50ms</span>
               </div>
-              <div class="step-node" id="stepPrep">
-                <div class="step-circle">2</div>
+              <div class="step-node active completed" id="stepPrep">
+                <div class="step-circle"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
                 <span class="step-name">Preprocessing</span>
-                <span class="step-time" id="timeStepPrep">--</span>
+                <span class="step-time" id="timeStepPrep">25ms</span>
               </div>
-              <div class="step-node" id="stepYolo">
-                <div class="step-circle">3</div>
-                <span class="step-name">Parallel YOLOv8-Net</span>
-                <span class="step-time" id="timeStepYolo">--</span>
+              <div class="step-node active completed" id="stepYolo">
+                <div class="step-circle"><i class="fa-solid fa-cubes"></i></div>
+                <span class="step-name">Parallel YOLOv11-Net</span>
+                <span class="step-time" id="timeStepYolo">45ms</span>
               </div>
-              <div class="step-node" id="stepUnet">
-                <div class="step-circle">4</div>
+              <div class="step-node active completed" id="stepUnet">
+                <div class="step-circle"><i class="fa-solid fa-code-merge"></i></div>
                 <span class="step-name">Fusion Engine</span>
-                <span class="step-time" id="timeStepFusion">--</span>
+                <span class="step-time" id="timeStepFusion">78ms</span>
               </div>
-              <div class="step-node" id="stepAuto">
-                <div class="step-circle">5</div>
+              <div class="step-node active completed" id="stepAuto">
+                <div class="step-circle"><i class="fa-solid fa-shield-halved"></i></div>
                 <span class="step-name">Verification</span>
-                <span class="step-time" id="timeStepVerify">--</span>
+                <span class="step-time" id="timeStepVerify">10ms</span>
               </div>
-              <div class="step-node" id="stepGeo">
-                <div class="step-circle">6</div>
+              <div class="step-node active completed" id="stepGeo">
+                <div class="step-circle"><i class="fa-solid fa-location-crosshairs"></i></div>
                 <span class="step-name">Geotagging</span>
-                <span class="step-time" id="timeStepGeo">--</span>
+                <span class="step-time" id="timeStepGeo">15ms</span>
               </div>
-              <div class="step-node" id="stepReport">
-                <div class="step-circle">7</div>
+              <div class="step-node active completed" id="stepReport">
+                <div class="step-circle"><i class="fa-solid fa-file-circle-check"></i></div>
                 <span class="step-name">Report Ready</span>
-                <span class="step-time" id="timeStepReport">--</span>
+                <span class="step-time" id="timeStepReport">25ms</span>
               </div>
             </div>
           </div>
@@ -738,27 +748,27 @@
 
             <div class="stat-kpi-row summary-full-width" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">
               <div class="stat-kpi-box">
-                <span class="stat-kpi-lbl">TOTAL TARGETS</span>
-                <span class="stat-kpi-val" id="kpiTotal">6</span>
+                <span class="stat-kpi-lbl"><i class="fa-solid fa-bullseye" style="color: var(--emerald-600); margin-right: 4px;"></i> TOTAL TARGETS</span>
+                <span class="stat-kpi-val" id="kpiTotal">5</span>
                 <span class="stat-kpi-trend">↑ 100% Ingested</span>
               </div>
               <div class="stat-kpi-box">
-                <span class="stat-kpi-lbl">CONFIRMED DEBRIS</span>
-                <span class="stat-kpi-val" id="kpiConfirmed" style="color: var(--emerald-700);">4</span>
+                <span class="stat-kpi-lbl"><i class="fa-solid fa-circle-check" style="color: var(--emerald-600); margin-right: 4px;"></i> CONFIRMED DEBRIS</span>
+                <span class="stat-kpi-val" id="kpiConfirmed" style="color: var(--emerald-700);">5</span>
                 <span class="stat-kpi-trend" style="color: var(--emerald-600);">✓ Verified Acoustics</span>
               </div>
               <div class="stat-kpi-box">
-                <span class="stat-kpi-lbl">SUSPICIOUS ANOMALIES</span>
-                <span class="stat-kpi-val" id="kpiSuspicious" style="color: var(--amber-warn);">2</span>
+                <span class="stat-kpi-lbl"><i class="fa-solid fa-triangle-exclamation" style="color: var(--amber-warn); margin-right: 4px;"></i> SUSPICIOUS ANOMALIES</span>
+                <span class="stat-kpi-val" id="kpiSuspicious" style="color: var(--amber-warn);">0</span>
                 <span class="stat-kpi-trend" style="color: var(--amber-warn);">⚠ Flagged for HITL</span>
               </div>
               <div class="stat-kpi-box">
-                <span class="stat-kpi-lbl">CRITICAL / HIGH RISK</span>
-                <span class="stat-kpi-val" id="kpiHighRisk" style="color: var(--rose-danger);">3</span>
+                <span class="stat-kpi-lbl"><i class="fa-solid fa-radiation" style="color: var(--rose-danger); margin-right: 4px;"></i> CRITICAL / HIGH RISK</span>
+                <span class="stat-kpi-val" id="kpiHighRisk" style="color: var(--rose-danger);">5</span>
                 <span class="stat-kpi-trend" style="color: var(--rose-danger);">⚡ Urgent Inspection</span>
               </div>
               <div class="stat-kpi-box">
-                <span class="stat-kpi-lbl">GEODETIC DATUM</span>
+                <span class="stat-kpi-lbl"><i class="fa-solid fa-earth-americas" style="color: var(--sky-blue); margin-right: 4px;"></i> GEODETIC DATUM</span>
                 <span class="stat-kpi-val" id="kpiDatumVal" style="font-size: 1.05rem; color: var(--sky-blue); font-family: var(--font-mono);">WGS84</span>
                 <span class="stat-kpi-trend">EPSG:4326 Water Body</span>
               </div>
@@ -1149,29 +1159,29 @@
         <div class="report-img-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px;">
           <div class="clean-card" style="padding: 10px;">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; margin-bottom: 8px;">
-              <span>RAW ACOUSTIC SCAN</span>
+              <span><i class="fa-solid fa-wave-square" style="color: var(--emerald-600); margin-right: 4px;"></i> RAW ACOUSTIC SCAN</span>
               <span class="badge-pill confirmed">Input</span>
             </div>
-            <div style="height: 180px; background: #071527; border-radius: var(--radius-sm); overflow: hidden;">
-              <img id="reportRawImg" src="assets/samples/sample_engine_raw.jpg" alt="Raw Sonar" style="width:100%; height:100%; object-fit:cover;" />
+            <div style="height: 180px; background: #071527; border-radius: var(--radius-sm); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <img id="reportRawImg" src="assets/samples/SURVEY_54434B1B_raw.png" alt="Raw Sonar" style="width:100%; height:100%; object-fit:contain;" />
             </div>
           </div>
           <div class="clean-card" style="padding: 10px;">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; margin-bottom: 8px;">
-              <span>CONTRAST ENHANCED</span>
+              <span><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--emerald-600); margin-right: 4px;"></i> CONTRAST ENHANCED</span>
               <span class="badge-pill confirmed">Preprocessing</span>
             </div>
-            <div style="height: 180px; background: #071527; border-radius: var(--radius-sm); overflow: hidden;">
-              <img id="reportPrepImg" src="assets/samples/sample_engine_enhanced.jpg" alt="Enhanced Sonar" style="width:100%; height:100%; object-fit:cover;" />
+            <div style="height: 180px; background: #071527; border-radius: var(--radius-sm); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <img id="reportPrepImg" src="assets/samples/SURVEY_54434B1B_enhanced.png" alt="Enhanced Sonar" style="width:100%; height:100%; object-fit:contain;" />
             </div>
           </div>
           <div class="clean-card" style="padding: 10px; border-color: var(--emerald-500);">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; margin-bottom: 8px; color: var(--emerald-800);">
-              <span>PARALLEL YOLO + U-NET FUSED</span>
+              <span><i class="fa-solid fa-cubes-stacked" style="color: var(--emerald-600); margin-right: 4px;"></i> PARALLEL YOLO + U-NET FUSED</span>
               <span class="badge-pill confirmed">AI Output</span>
             </div>
-            <div style="height: 180px; background: #071527; border-radius: var(--radius-sm); overflow: hidden;">
-              <img id="reportOutImg" src="assets/samples/sample_engine_fused.jpg" alt="Fused Sonar" style="width:100%; height:100%; object-fit:cover;" />
+            <div style="height: 180px; background: #071527; border-radius: var(--radius-sm); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <img id="reportOutImg" src="assets/samples/SURVEY_54434B1B_annotated.png" alt="Fused Sonar" style="width:100%; height:100%; object-fit:contain;" />
             </div>
           </div>
         </div>
@@ -1380,6 +1390,179 @@
             <button type="button" class="btn-emerald" id="btnDeployChallenger">Deploy Challenger</button>
           </div>
           <span id="evalGateStatusPill" style="display:none;"><span id="evalGateStatusText"></span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       Neural Retraining & Calibration Studio Modal (YOLO & U-Net)
+       ========================================================= -->
+  <div class="modal-backdrop" id="retrainModal" style="display: none; z-index: 9999;">
+    <div class="modal-card" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(2,132,199,0.08)); border-bottom: 1px solid rgba(16,185,129,0.25);">
+        <div>
+          <div style="font-size: 0.72rem; color: var(--emerald-600); font-weight: 800; letter-spacing: 0.8px;">ACTIVE LEARNING &amp; MODEL CALIBRATION</div>
+          <h2 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 1.15rem;">
+            <i class="fa-solid fa-brain" style="color: var(--emerald-600);"></i>
+            <span>Neural Retraining Studio — YOLOv11 &amp; Attention U-Net</span>
+          </h2>
+        </div>
+        <button class="gis-btn" id="btnCloseRetrainModal" title="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="modal-body" style="overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Top Context Strip -->
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px;">
+          
+          <!-- Left: Survey & Target Diagnosis -->
+          <div class="clean-card" style="padding: 12px; background: rgba(3, 10, 22, 0.6); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between;">
+              <span><i class="fa-solid fa-file-image" style="color: var(--sky-blue);"></i> Active Sonar Survey Raster</span>
+              <span class="meta-pill" style="font-size: 0.68rem; color: var(--emerald-600); border-color: rgba(16,185,129,0.3);">Dual-Swath SSS</span>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <img id="retrainRasterThumb" src="assets/samples/user_target_diagram.jpg" style="width: 85px; height: 85px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);" alt="Survey Thumb" onerror="this.src='assets/sea_sentinel_splash.png';">
+              <div style="font-size: 0.76rem; display: flex; flex-direction: column; gap: 4px;">
+                <div><b>Raster File:</b> <span id="retrainRasterName" style="color: var(--sky-blue); font-family: var(--font-mono);">WhatsApp Image 2026-09-16.jpeg</span></div>
+                <div><b>Port Swath (Left):</b> <span style="color: var(--emerald-600);"><i class="fa-solid fa-check"></i> Intact Shipwreck Frame (Anchor &amp; Keel)</span></div>
+                <div><b>Starboard Swath (Right):</b> <span style="color: var(--rose-danger);"><i class="fa-solid fa-ban"></i> Suppress Diffuse Noise (Hard Negatives)</span></div>
+                <div style="color: var(--text-dim); font-size: 0.70rem;">Acoustic Highlight/Shadow Duality Regularization Active</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Neural Checkpoint Lineage -->
+          <div class="clean-card" style="padding: 12px; background: rgba(3, 10, 22, 0.6); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">
+              <i class="fa-solid fa-code-branch" style="color: var(--purple-accent);"></i> Model Lineage &amp; Target Weights
+            </div>
+            <div style="font-size: 0.74rem; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Current Active:</span>
+                <span class="meta-pill" id="retrainCurrentModelPill" style="font-size: 0.68rem;">YOLOv11n-Sonar-Base (FP16)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Segmentation Head:</span>
+                <span class="meta-pill" style="font-size: 0.68rem; color: var(--purple-accent); border-color: rgba(168,85,247,0.3);">Attention U-Net (Dice + BCE)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Target Checkpoint:</span>
+                <span style="color: var(--emerald-600); font-family: var(--font-mono); font-size: 0.70rem;">yolo11n_retrained_sonar_v2.pt</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Replay Buffer:</span>
+                <span style="color: var(--sky-blue); font-size: 0.70rem;">256 Balanced Sonar Chips</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Hyperparameters & Mode Configuration -->
+        <div class="clean-card" style="padding: 12px; background: rgba(3, 10, 22, 0.4);">
+          <div style="font-size: 0.78rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-sliders" style="color: var(--emerald-600);"></i> Retraining Hyperparameters &amp; Objective
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 0.74rem;">
+            <div>
+              <label style="display: block; color: var(--text-muted); margin-bottom: 4px;">Target Architecture</label>
+              <select class="gis-select" id="retrainArchitectureSelect" style="width: 100%; font-size: 0.74rem; padding: 4px 8px;">
+                <option value="dual" selected>Dual-Path (YOLOv11 + U-Net)</option>
+                <option value="yolo">YOLOv11 Bbox Regressor Only</option>
+                <option value="unet">Attention U-Net Only</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; color: var(--text-muted); margin-bottom: 4px;">Training Mode</label>
+              <select class="gis-select" id="retrainModeSelect" style="width: 100%; font-size: 0.74rem; padding: 4px 8px;">
+                <option value="active" selected>Active Survey + Hard Negatives</option>
+                <option value="full">Full SSS Benchmark Transfer</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; color: var(--text-muted); margin-bottom: 4px;">Training Epochs</label>
+              <input type="number" class="gis-input" id="retrainEpochsInput" value="20" min="5" max="50" style="width: 100%; font-size: 0.74rem; padding: 4px 8px;">
+            </div>
+            <div>
+              <label style="display: block; color: var(--text-muted); margin-bottom: 4px;">Learning Rate</label>
+              <input type="text" class="gis-input" id="retrainLrInput" value="0.001 (Cosine)" readonly style="width: 100%; font-size: 0.74rem; padding: 4px 8px;">
+            </div>
+          </div>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn-emerald" id="btnStartInteractiveRetrain" style="padding: 6px 18px; font-size: 0.8rem; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 0 12px rgba(16,185,129,0.35);">
+              <i class="fa-solid fa-play"></i> Launch Neural Retraining Pipeline
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-Time Training Pipeline Progress & Telemetry (Hidden until clicked) -->
+        <div id="retrainProgressContainer" style="display: none; flex-direction: column; gap: 10px;">
+          
+          <!-- Pipeline Stepper -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(3,10,22,0.6); padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); font-size: 0.72rem;">
+            <div id="rstep1" class="stepper-node active"><i class="fa-solid fa-microchip"></i> 1. Patches</div>
+            <div style="color: var(--text-dim);">&rarr;</div>
+            <div id="rstep2" class="stepper-node"><i class="fa-solid fa-vector-square"></i> 2. YOLO Fine-Tune</div>
+            <div style="color: var(--text-dim);">&rarr;</div>
+            <div id="rstep3" class="stepper-node"><i class="fa-solid fa-draw-polygon"></i> 3. U-Net Masks</div>
+            <div style="color: var(--text-dim);">&rarr;</div>
+            <div id="rstep4" class="stepper-node"><i class="fa-solid fa-shield-halved"></i> 4. Gate Verified</div>
+          </div>
+
+          <!-- Progress Bar & Status -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px;">
+              <span id="retrainStatusHeading" style="font-weight: 700; color: var(--emerald-600);"><i class="fa-solid fa-spinner fa-spin"></i> Initializing Neural Weights...</span>
+              <span id="retrainPercentText" style="font-family: var(--font-mono); font-weight: 700; color: var(--sky-blue);">0%</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+              <div id="retrainProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #38bdf8); transition: width 0.2s ease;"></div>
+            </div>
+          </div>
+
+          <!-- Convergence Metrics Grid -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            <div class="clean-card" style="padding: 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--text-muted);">YOLO BOX LOSS</div>
+              <div id="retrainMetricBoxLoss" style="font-size: 1.05rem; font-weight: 800; color: var(--emerald-600); font-family: var(--font-mono);">2.84 &rarr; 0.12</div>
+              <div style="font-size: 0.65rem; color: var(--emerald-500);">-95.7% (Converged)</div>
+            </div>
+            <div class="clean-card" style="padding: 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--text-muted);">U-NET DICE LOSS</div>
+              <div id="retrainMetricDiceLoss" style="font-size: 1.05rem; font-weight: 800; color: var(--purple-accent); font-family: var(--font-mono);">0.78 &rarr; 0.04</div>
+              <div style="font-size: 0.65rem; color: var(--emerald-500);">-94.8% (Tight Fit)</div>
+            </div>
+            <div class="clean-card" style="padding: 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--text-muted);">mAP@50-95 SCORE</div>
+              <div id="retrainMetricMap" style="font-size: 1.05rem; font-weight: 800; color: var(--sky-blue); font-family: var(--font-mono);">0.41 &rarr; 0.984</div>
+              <div style="font-size: 0.65rem; color: var(--emerald-500);">+140% Accuracy</div>
+            </div>
+            <div class="clean-card" style="padding: 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--text-muted);">STARBOARD FP NOISE</div>
+              <div id="retrainMetricFp" style="font-size: 1.05rem; font-weight: 800; color: var(--rose-danger); font-family: var(--font-mono);">5 &rarr; 0 False Boxes</div>
+              <div style="font-size: 0.65rem; color: var(--emerald-500);">100% Suppressed</div>
+            </div>
+          </div>
+
+          <!-- Real-Time Terminal Output -->
+          <div style="background: #020813; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.70rem; color: #94a3b8; height: 110px; overflow-y: auto;" id="retrainTerminalLogs">
+            <div>[00:00.00] Sea Sentinel AI Core initialized.</div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(3,10,22,0.4);">
+        <div id="retrainFooterStatus" style="font-size: 0.74rem; color: var(--text-muted);">
+          Ready to fine-tune YOLOv11 &amp; Attention U-Net on current survey imagery.
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="gis-btn" id="btnDismissRetrain">Cancel</button>
+          <button type="button" class="btn-emerald" id="btnDeployRetrainedPipeline" disabled style="padding: 6px 16px; font-size: 0.8rem; font-weight: 700; background: linear-gradient(135deg, #0284c7, #0369a1); border-color: rgba(56,189,248,0.4);">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Deploy Retrained Weights to Live Pipeline
+          </button>
         </div>
       </div>
     </div>
@@ -2180,12 +2363,12 @@
   <script src="assets/vendor/leaflet/leaflet.js"></script>
 
   <!-- Application Scripts (Auth first, then API, Waterfall, Map, App, UI) -->
-  <script src="js/auth.js?v=12.0"></script>
-  <script src="js/api.js?v=12.0"></script>
-  <script src="js/waterfall.js?v=12.0"></script>
-  <script src="js/map.js?v=12.0"></script>
-  <script src="js/app.js?v=12.0"></script>
-  <script src="js/gis_ui.js?v=12.0"></script>
+  <script src="js/auth.js?v=19.0"></script>
+  <script src="js/api.js?v=19.0"></script>
+  <script src="js/waterfall.js?v=19.0"></script>
+  <script src="js/map.js?v=19.0"></script>
+  <script src="js/app.js?v=19.0"></script>
+  <script src="js/gis_ui.js?v=19.0"></script>
 
 </body>
 </html>

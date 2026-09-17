@@ -37,12 +37,18 @@ class GISUIController {
 
     const switchView = (mode) => {
       [tabWaterfall, tabSplit, tabMap].forEach(t => t && t.classList.remove('active'));
+      const activeTab = document.querySelector(`.tab-btn[data-tab="${mode}"]`) || (mode === 'waterfall' ? tabWaterfall : (mode === 'map' ? tabMap : tabSplit));
+      if (activeTab) activeTab.classList.add('active');
+
       if (mode === 'waterfall') {
-        if (tabWaterfall) tabWaterfall.classList.add('active');
-        if (cardWaterfall) cardWaterfall.style.display = 'block';
+        if (cardWaterfall) {
+          cardWaterfall.style.display = 'block';
+          if (window.app && window.app.waterfall) {
+            window.app.waterfall.render();
+          }
+        }
         if (cardMap) cardMap.style.display = 'none';
       } else if (mode === 'map') {
-        if (tabMap) tabMap.classList.add('active');
         if (cardWaterfall) cardWaterfall.style.display = 'none';
         if (cardMap) {
           cardMap.style.display = 'block';
@@ -56,9 +62,13 @@ class GISUIController {
             }, delay);
           });
         }
-      } else if (mode === 'split') {
-        if (tabSplit) tabSplit.classList.add('active');
-        if (cardWaterfall) cardWaterfall.style.display = 'block';
+      } else { // 'split' or default
+        if (cardWaterfall) {
+          cardWaterfall.style.display = 'block';
+          if (window.app && window.app.waterfall) {
+            window.app.waterfall.render();
+          }
+        }
         if (cardMap) {
           cardMap.style.display = 'block';
           [50, 150, 300].forEach(delay => {
@@ -77,8 +87,37 @@ class GISUIController {
     if (tabWaterfall) tabWaterfall.onclick = () => switchView('waterfall');
     if (tabSplit) tabSplit.onclick = () => switchView('split');
     if (tabMap) tabMap.onclick = () => switchView('map');
+    window.switchWorkspaceView = switchView;
 
     // 2. Navigation Sidebar & Header Triggers
+    const navOverview = document.getElementById('navOverview');
+    if (navOverview) {
+      navOverview.onclick = (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(n => n.classList.remove('active'));
+        navOverview.classList.add('active');
+        switchView('split');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    }
+
+    const navSurveys = document.getElementById('navSurveys');
+    if (navSurveys) {
+      navSurveys.onclick = (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(n => n.classList.remove('active'));
+        navSurveys.classList.add('active');
+        switchView('waterfall');
+        if (cardWaterfall) {
+          cardWaterfall.style.display = 'block';
+          cardWaterfall.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        if (window.app && window.app.waterfall) {
+          window.app.waterfall.render();
+        }
+      };
+    }
+
     const navEntireOcean = document.getElementById('navItemEntireOcean') || document.getElementById('navEntireOcean');
     if (navEntireOcean) {
       navEntireOcean.onclick = (e) => {
@@ -91,9 +130,18 @@ class GISUIController {
     if (navCurrentGis) {
       navCurrentGis.onclick = (e) => {
         e.preventDefault();
-        switchView('map');
-        const m = getGisMap();
-        if (m) m.fitCurrentInput();
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(n => n.classList.remove('active'));
+        navCurrentGis.classList.add('active');
+        switchView('split');
+        if (cardMap) {
+          cardMap.style.display = 'block';
+          cardMap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const m = getGisMap();
+          if (m) {
+            m.invalidateSize();
+            m.fitCurrentInput();
+          }
+        }
       };
     }
 

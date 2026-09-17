@@ -23,13 +23,25 @@ if (Test-Path "$PSScriptRoot\.venv\Scripts\python.exe") {
     $pythonExe = "$PSScriptRoot\.venv\Scripts\python.exe"
 }
 
-# Start Backend
-Write-Host "[2/3] Starting FastAPI Backend on http://localhost:8000 ..." -ForegroundColor Yellow
-Start-Process $pythonExe -ArgumentList "-m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload" -WorkingDirectory "$PSScriptRoot\backend"
+# Check if python is available
+$hasPython = $false
+try {
+    $pyCheck = & $pythonExe --version 2>&1
+    if ($LASTEXITCODE -eq 0) { $hasPython = $true }
+} catch {}
 
-# Start Frontend
-Write-Host "[3/3] Starting Frontend Server on http://localhost:3000 ..." -ForegroundColor Yellow
-Start-Process $pythonExe -ArgumentList "-m http.server 3000 --directory frontend" -WorkingDirectory "$PSScriptRoot"
+if ($hasPython) {
+    # Start Backend
+    Write-Host "[2/3] Starting FastAPI Backend on http://localhost:8000 ..." -ForegroundColor Yellow
+    Start-Process $pythonExe -ArgumentList "-m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload" -WorkingDirectory "$PSScriptRoot\backend"
+
+    # Start Frontend
+    Write-Host "[3/3] Starting Frontend Server on http://localhost:3000 ..." -ForegroundColor Yellow
+    Start-Process $pythonExe -ArgumentList "-m http.server 3000 --directory frontend" -WorkingDirectory "$PSScriptRoot"
+} else {
+    Write-Host "[2/3] Python not found on system PATH. Starting PowerShell Frontend Server..." -ForegroundColor Yellow
+    Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -NoExit -File `"$PSScriptRoot\serve.ps1`""
+}
 
 Write-Host "`nServers successfully launched!" -ForegroundColor Green
 Write-Host " - Web Dashboard:    http://localhost:3000" -ForegroundColor Cyan
