@@ -16,6 +16,7 @@ Strictly adheres to modular tool boundaries; orchestrates specialized engines wi
 """
 
 from typing import Dict, Any, List, Optional
+from datetime import datetime
 import os
 import math
 import uuid
@@ -98,19 +99,16 @@ class SIHPipelineAgent:
             if cand and os.path.exists(cand):
                 return os.path.abspath(cand)
                 
-        # Also check project root models directory fallbacks
+        # Also check model subdirectories specifically for the matching base_name
         base_name = os.path.basename(raw_path)
-        common_fallbacks = [
-            os.path.join(project_dir, "models", "yolo", base_name),
-            os.path.join(project_dir, "models", "unet", base_name),
-            os.path.join(project_dir, "models", "autoencoder", base_name),
-            os.path.join(project_dir, "models", "yolo", "best.pt"),
-            os.path.join(project_dir, "models", "unet", "attention_unet_best.pt"),
-            os.path.join(project_dir, "models", "autoencoder", "baseline_autoencoder.pt")
-        ]
-        for fb in common_fallbacks:
-            if os.path.exists(fb):
-                return os.path.abspath(fb)
+        for subdir in ["yolo", "unet", "autoencoder"]:
+            for root_dir in [project_dir, backend_dir]:
+                cand_sub = os.path.join(root_dir, "models", subdir, base_name)
+                if os.path.exists(cand_sub):
+                    return os.path.abspath(cand_sub)
+                cand_ckpt = os.path.join(root_dir, "models", "checkpoints", subdir, base_name)
+                if os.path.exists(cand_ckpt):
+                    return os.path.abspath(cand_ckpt)
 
         return raw_path
 

@@ -170,7 +170,7 @@ def test_unet_segmenter_contract():
     2. With loaded weights -> performs segmentation, returns contours, overlay
     """
     # 1. Unloaded model state
-    segmenter = UNetSegmenter()
+    segmenter = UNetSegmenter(checkpoint_path="non_existent_weights.pt")
     res = segmenter.segment_roi(None)
     assert res["status"] == "model_unavailable"
     assert res["mask_available"] is False

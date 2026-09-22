@@ -68,11 +68,16 @@ class YOLODetector:
                 self.model = YOLO(self.model_path)
                 self.is_model_loaded = True
                 if hasattr(self.model, "names") and self.model.names:
-                    # Update classes if custom trained
-                    self.classes = {int(k): v for k, v in self.model.names.items()}
+                    # Only overwrite classes if model was custom-trained with debris taxonomy (<= 15 classes)
+                    if len(self.model.names) <= 15:
+                        self.classes = {int(k): v for k, v in self.model.names.items()}
             except Exception as e:
                 print(f"[YOLODetector] Warning: Failed to load weights from {self.model_path}: {e}")
                 self.is_model_loaded = False
+        elif self.model_path is not None:
+            # Explicit path was specified but does not exist on disk
+            print(f"[YOLODetector] Warning: Specified checkpoint path does not exist: {self.model_path}")
+            self.is_model_loaded = False
         else:
             # Fallback to custom trained best.pt in project root models/yolo/best.pt
             backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -82,6 +87,8 @@ class YOLODetector:
                 os.path.join(project_dir, "models", "yolo", "best_fp16.pt"),
                 os.path.join(project_dir, "models", "yolo", "best.pt"),
                 os.path.join(backend_dir, "models", "yolo", "best.pt"),
+                os.path.join(backend_dir, "models", "checkpoints", "sih57_yolo_run", "weights", "best.pt"),
+                os.path.join(backend_dir, "models", "checkpoints", "yolo", "best.pt"),
                 os.path.join(backend_dir, "yolo11n.pt")
             ]
             loaded = False
@@ -91,7 +98,8 @@ class YOLODetector:
                         self.model = YOLO(cand)
                         self.is_model_loaded = True
                         if hasattr(self.model, "names") and self.model.names:
-                            self.classes = {int(k): v for k, v in self.model.names.items()}
+                            if len(self.model.names) <= 15:
+                                self.classes = {int(k): v for k, v in self.model.names.items()}
                         loaded = True
                         break
                     except Exception as e:
@@ -155,8 +163,23 @@ class YOLODetector:
             for box in boxes:
                 xyxy = box.xyxy[0].cpu().numpy()
                 conf_val = float(box.conf[0].cpu().numpy())
-                cls_idx = int(box.cls[0].cpu().numpy())
-                cls_name = self.classes.get(cls_idx, "marine_debris")
+                cls_idx = int(box.cls[0].cpu().numpy()) if box.cls is not None else 0
+                raw_cls_name = "marine_debris"
+                if hasattr(self.model, "names") and cls_idx in self.model.names:
+                    raw_cls_name = str(self.model.names[cls_idx]).lower()
+                
+                valid_classes = {"fishing_net", "pipeline_or_cable", "shipwreck_fragment", "engine_debris", "riprap_debris", "marine_debris"}
+                if raw_cls_name in valid_classes:
+                    cls_name = raw_cls_name
+                else:
+                    COCO_MAP = {
+                        "boat": "shipwreck_fragment", "airplane": "shipwreck_fragment", "train": "shipwreck_fragment", "bus": "shipwreck_fragment",
+                        "truck": "engine_debris", "car": "engine_debris", "motorcycle": "engine_debris", "bench": "engine_debris",
+                        "kite": "fishing_net", "sports ball": "fishing_net", "frisbee": "fishing_net", "backpack": "fishing_net",
+                        "skateboard": "pipeline_or_cable", "skis": "pipeline_or_cable", "snowboard": "pipeline_or_cable", "tie": "pipeline_or_cable",
+                        "bottle": "marine_debris", "cup": "marine_debris", "suitcase": "marine_debris"
+                    }
+                    cls_name = COCO_MAP.get(raw_cls_name, self.classes.get(cls_idx, "marine_debris"))
 
                 x1 = round(float(xyxy[0]), 1)
                 y1 = round(float(xyxy[1]), 1)

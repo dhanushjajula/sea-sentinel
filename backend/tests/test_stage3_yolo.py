@@ -23,16 +23,21 @@ def test_dataset_compatibility():
 
 def test_detector_initialization():
     # Test without weights (honest fallback)
-    detector = YOLODetector(model_path=None, conf_thresh=0.40)
-    assert detector.is_model_loaded is False
-    assert detector.conf_thresh == 0.40
+    detector_no_weights = YOLODetector(model_path="non_existent_weights.pt", conf_thresh=0.40)
+    assert detector_no_weights.is_model_loaded is False
+    assert detector_no_weights.conf_thresh == 0.40
 
     # Test inference output when weights are not loaded
     dummy = np.zeros((640, 640, 3), dtype=np.uint8)
-    res = detector.detect(dummy)
+    res = detector_no_weights.detect(dummy)
     assert res["status"] == "model_unavailable"
     assert res["model_loaded"] is False
     assert len(res["detections"]) == 0
+
+    # Test with trained model
+    detector = YOLODetector()
+    assert detector.is_model_loaded is True
+    assert "fishing_net" in detector.classes.values()
 
 def test_draw_detections():
     detector = YOLODetector()
@@ -61,5 +66,5 @@ if __name__ == "__main__":
     test_dataset_compatibility()
     test_detector_initialization()
     test_draw_detections()
-    test_confusion_matrix_generation()
+    test_bbox_iou_computation()
     print("All Stage 3 YOLO unit tests passed successfully!")

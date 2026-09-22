@@ -337,6 +337,68 @@ def get_sample_missions():
     """Returns curated benchmark acoustic sonar scans for immediate 1-click survey analysis."""
     samples = [
         {
+            "id": "florida_straits_shipwreck",
+            "name": "Florida Straits Shipwreck Field (Survey 54434B1B)",
+            "category": "shipwreck_fragment",
+            "risk_hint": "CRITICAL",
+            "filename": "SURVEY_54434B1B_raw.png",
+            "enhanced_filename": "SURVEY_54434B1B_enhanced.png",
+            "annotated_filename": "SURVEY_54434B1B_annotated.png",
+            "description": "High-resolution side-scan sonar survey of shipwreck hull, displaced machinery, and framing ribs in the Florida Straits shipping corridor. WGS84 UTM 17N (Case A).",
+            "path": os.path.join(SAMPLES_DIR, "SURVEY_54434B1B_raw.png"),
+            "url": "/static/samples/SURVEY_54434B1B_raw.png",
+            "georef_case": "A",
+            "simulated_coords": {"lat": 25.77310, "lon": -76.95820}
+        },
+        {
+            "id": "china_offshore_quanzhou_net",
+            "name": "China Offshore - Ghost Net & Gear (Zenodo 20048164)",
+            "category": "fishing_net",
+            "risk_hint": "HIGH",
+            "filename": "china_offshore_quanzhou_net.jpg",
+            "description": "Authentic side-scan sonar image chip of entangled ghost fishing net. Porous synthetic fiber reverberation with trailing acoustic shadow. Case C Unreferenced.",
+            "path": os.path.join(SAMPLES_DIR, "china_offshore_quanzhou_net.jpg"),
+            "url": "/static/samples/china_offshore_quanzhou_net.jpg",
+            "georef_case": "C",
+            "simulated_coords": None
+        },
+        {
+            "id": "china_offshore_dongying_pipe",
+            "name": "China Offshore - Subsea Pipeline (Zenodo 20048164)",
+            "category": "pipeline_or_cable",
+            "risk_hint": "HIGH",
+            "filename": "china_offshore_dongying_pipeline.jpg",
+            "description": "Continuous linear acoustic backscatter signature of subsea pipeline with uniform shadow depression. Case C Unreferenced.",
+            "path": os.path.join(SAMPLES_DIR, "china_offshore_dongying_pipeline.jpg"),
+            "url": "/static/samples/china_offshore_dongying_pipeline.jpg",
+            "georef_case": "C",
+            "simulated_coords": None
+        },
+        {
+            "id": "china_offshore_dongying_engine",
+            "name": "Offshore Industrial - Engine Block & Machinery",
+            "category": "engine_debris",
+            "risk_hint": "CRITICAL",
+            "filename": "china_offshore_dongying_engine.jpg",
+            "description": "High-density metallic acoustic contact of sunken engine machinery and mounting bed. Sharp shadow relief indicating 8.6m seabed elevation. Case C.",
+            "path": os.path.join(SAMPLES_DIR, "china_offshore_dongying_engine.jpg"),
+            "url": "/static/samples/china_offshore_dongying_engine.jpg",
+            "georef_case": "C",
+            "simulated_coords": None
+        },
+        {
+            "id": "towfish_mission_case_b",
+            "name": "Towfish Survey + Nav Telemetry (Case B)",
+            "category": "sonar_waterfall",
+            "risk_hint": "HIGH",
+            "filename": "towfish_mission_case_b.png",
+            "description": "Acoustic waterfall accompanied by navigation log (latitude, longitude, heading, altitude). Geodesic slant-to-ground range forward projection.",
+            "path": os.path.join(SAMPLES_DIR, "towfish_mission_case_b.png"),
+            "url": "/static/samples/towfish_mission_case_b.png",
+            "georef_case": "B",
+            "simulated_coords": {"lat": 30.193838, "lon": -87.880987}
+        },
+        {
             "id": "noaa_h11584_gulf",
             "name": "NOAA Survey H11584 Mosaic (Gulf of Mexico)",
             "category": "georeferenced_mosaic",
@@ -359,42 +421,6 @@ def get_sample_missions():
             "url": "/static/samples/usgs_14bim05_breton_sample.tif",
             "georef_case": "A",
             "simulated_coords": {"lat": 29.425020, "lon": -89.193541}
-        },
-        {
-            "id": "towfish_mission_case_b",
-            "name": "Towfish Survey + Nav Telemetry (Case B)",
-            "category": "sonar_waterfall",
-            "risk_hint": "HIGH",
-            "filename": "towfish_mission_case_b.png",
-            "description": "Acoustic waterfall accompanied by navigation log (latitude, longitude, heading, altitude). Geodesic slant-to-ground range forward projection.",
-            "path": os.path.join(SAMPLES_DIR, "towfish_mission_case_b.png"),
-            "url": "/static/samples/towfish_mission_case_b.png",
-            "georef_case": "B",
-            "simulated_coords": {"lat": 30.193838, "lon": -87.880987}
-        },
-        {
-            "id": "china_offshore_quanzhou_net",
-            "name": "China Offshore SSS-AI (Zenodo 20048164)",
-            "category": "fishing_net",
-            "risk_hint": "HIGH",
-            "filename": "china_offshore_quanzhou_net.jpg",
-            "description": "Standardized cropped SSS image chip from Zenodo 20048164. Release contains image pixels only; no coordinates provided. Case C Unreferenced.",
-            "path": os.path.join(SAMPLES_DIR, "china_offshore_quanzhou_net.jpg"),
-            "url": "/static/samples/china_offshore_quanzhou_net.jpg",
-            "georef_case": "C",
-            "simulated_coords": None
-        },
-        {
-            "id": "china_offshore_dongying_pipe",
-            "name": "China Offshore SSS-AI Pipeline (Zenodo 20048164)",
-            "category": "pipeline_or_cable",
-            "risk_hint": "HIGH",
-            "filename": "china_offshore_dongying_pipeline.jpg",
-            "description": "Continuous linear acoustic signature from Zenodo 20048164. No telemetry provided in dataset; coordinates are strictly withheld.",
-            "path": os.path.join(SAMPLES_DIR, "china_offshore_dongying_pipeline.jpg"),
-            "url": "/static/samples/china_offshore_dongying_pipeline.jpg",
-            "georef_case": "C",
-            "simulated_coords": None
         }
     ]
     valid_samples = [s for s in samples if os.path.exists(s["path"])]
@@ -405,6 +431,56 @@ def get_sample_missions():
     }
 
 
+def resolve_survey_image_path(raw_path: str) -> str:
+    """
+    Robustly resolves survey image path across absolute, relative, frontend assets,
+    datasets/samples, static URLs, and uploaded files.
+    """
+    if not raw_path:
+        return raw_path
+
+    clean_path = raw_path.split("?")[0].strip()
+
+    if os.path.isabs(clean_path) and os.path.exists(clean_path):
+        return os.path.abspath(clean_path)
+
+    if os.path.exists(clean_path):
+        return os.path.abspath(clean_path)
+
+    base_name = os.path.basename(clean_path)
+    parent_dir = os.path.dirname(PROJECT_ROOT)
+
+    candidates = [
+        os.path.join(PROJECT_ROOT, clean_path),
+        os.path.join(SAMPLES_DIR, base_name),
+        os.path.join(UPLOADS_DIR, base_name),
+        os.path.join(PREPROCESSED_DIR, base_name),
+        os.path.join(parent_dir, "frontend", "assets", "samples", base_name),
+        os.path.join(parent_dir, "frontend", clean_path),
+        os.path.join(parent_dir, clean_path),
+        os.path.join(PROJECT_ROOT, "datasets", "samples", base_name),
+        os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "test", base_name),
+        os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "val", base_name),
+        os.path.join(PROJECT_ROOT, "datasets", "processed", "yolo_dataset", "images", "train", base_name),
+    ]
+
+    if clean_path.startswith("/static/"):
+        rel = clean_path[len("/static/"):]
+        candidates.insert(0, os.path.join(PROJECT_ROOT, "outputs", rel))
+        candidates.insert(1, os.path.join(PROJECT_ROOT, "datasets", rel))
+        candidates.insert(2, os.path.join(SAMPLES_DIR, base_name))
+
+    if clean_path.startswith("assets/"):
+        candidates.insert(0, os.path.join(parent_dir, "frontend", clean_path))
+        candidates.insert(1, os.path.join(SAMPLES_DIR, base_name))
+
+    for cand in candidates:
+        if cand and os.path.exists(cand):
+            return os.path.abspath(cand)
+
+    return clean_path
+
+
 import cv2
 import numpy as np
 
@@ -412,8 +488,10 @@ import numpy as np
 @app.get("/api/image")
 def get_image_file(path: str = Query(...)):
     """Safely streams image files to the frontend UI, converting TIFF/GeoTIFF to PNG for browser compatibility."""
-    real_path = os.path.abspath(path)
-    if not real_path.lower().startswith(PROJECT_ROOT.lower()):
+    resolved = resolve_survey_image_path(path)
+    real_path = os.path.abspath(resolved)
+    parent_dir = os.path.dirname(PROJECT_ROOT)
+    if not (real_path.lower().startswith(PROJECT_ROOT.lower()) or real_path.lower().startswith(parent_dir.lower())):
         raise HTTPException(status_code=403, detail="Access denied: path outside project root.")
     if not os.path.exists(real_path):
         raise HTTPException(status_code=404, detail="Image file not found.")
@@ -522,11 +600,12 @@ def analyze_survey(req: AnalyzeRequest):
     """
     Executes end-to-end Parallel YOLO + U-Net survey analysis on the given sonar image.
     """
-    if not os.path.exists(req.image_path):
+    resolved_path = resolve_survey_image_path(req.image_path)
+    if not os.path.exists(resolved_path):
         raise HTTPException(status_code=404, detail=f"Image not found at: {req.image_path}")
 
     res = agent.analyze_image(
-        image_path=req.image_path,
+        image_path=resolved_path,
         raster_meta_override=req.raster_meta,
         nav_log=req.nav_log,
         frame_idx=req.frame_idx or 1,
@@ -544,7 +623,7 @@ def analyze_survey(req: AnalyzeRequest):
     if raw_p and os.path.exists(raw_p):
         res["raw_image_url"] = f"/static/preprocessed/{os.path.basename(raw_p)}"
     else:
-        res["raw_image_url"] = f"/api/image?path={os.path.abspath(req.image_path)}"
+        res["raw_image_url"] = f"/api/image?path={os.path.abspath(resolved_path)}"
     
     enhanced_p = res.get("enhanced_image_path")
     if enhanced_p and os.path.exists(enhanced_p):
@@ -557,7 +636,7 @@ def analyze_survey(req: AnalyzeRequest):
     # Register with GIS Spatial Intelligence Engine
     try:
         register_gis_survey(
-            image_path=req.image_path,
+            image_path=resolved_path,
             analysis_result=res,
             raster_meta_override=req.raster_meta,
             nav_log=req.nav_log
@@ -570,7 +649,7 @@ def analyze_survey(req: AnalyzeRequest):
         metrics_eng = get_metrics_engine()
         dets = res.get("detections") or res.get("objects") or res.get("fused_objects") or res.get("yolo_candidates") or []
         res["evaluation_metrics"] = metrics_eng.evaluate_image(
-            image_path=req.image_path,
+            image_path=resolved_path,
             detections=dets,
             segmentation_mask=res.get("segmentation_mask")
         )
@@ -589,10 +668,11 @@ def infer_yolo_endpoint(req: YoloInferRequest):
     """
     Executes independent YOLO object detection on the provided image without invoking U-Net.
     """
-    if not os.path.exists(req.image_path):
+    resolved_path = resolve_survey_image_path(req.image_path)
+    if not os.path.exists(resolved_path):
         raise HTTPException(status_code=404, detail=f"Image not found at: {req.image_path}")
 
-    raw_img, _ = agent.preprocessor.load_image_as_grayscale(req.image_path)
+    raw_img, _ = agent.preprocessor.load_image_as_grayscale(resolved_path)
     prep_out = agent.preprocessor.preprocess(raw_img)
     proc_img = prep_out.get("preprocessed_image", raw_img)
 
@@ -608,10 +688,11 @@ def infer_unet_endpoint(req: UnetInferRequest):
     """
     Executes independent U-Net segmentation and candidate extraction without requiring YOLO boxes.
     """
-    if not os.path.exists(req.image_path):
+    resolved_path = resolve_survey_image_path(req.image_path)
+    if not os.path.exists(resolved_path):
         raise HTTPException(status_code=404, detail=f"Image not found at: {req.image_path}")
 
-    raw_img, _ = agent.preprocessor.load_image_as_grayscale(req.image_path)
+    raw_img, _ = agent.preprocessor.load_image_as_grayscale(resolved_path)
     prep_out = agent.preprocessor.preprocess(raw_img)
     proc_img = prep_out.get("preprocessed_image", raw_img)
 

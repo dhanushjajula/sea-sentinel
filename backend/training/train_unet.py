@@ -35,7 +35,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train U-Net / Attention U-Net for Sonar Debris Segmentation")
     parser.add_argument("--model", type=str, default="attention_unet", choices=["attention_unet", "unet"],
                         help="Model architecture: 'attention_unet' or 'unet'")
-    parser.add_argument("--data-dir", type=str, default=os.path.join(PROJECT_ROOT, "datasets"),
+    default_data_dir = os.path.join(PROJECT_ROOT, "datasets", "processed", "segmentation_dataset")
+    if not os.path.exists(default_data_dir):
+        default_data_dir = os.path.join(PROJECT_ROOT, "datasets")
+    parser.add_argument("--data-dir", type=str, default=default_data_dir,
                         help="Root directory to search for images and segmentation masks")
     parser.add_argument("--img-size", type=int, default=256, help="Input spatial resolution (H=W)")
     parser.add_argument("--batch-size", type=int, default=8, help="Mini-batch size")

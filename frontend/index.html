@@ -623,29 +623,29 @@
             </div>
 
             <!-- Layer Control Bar -->
-            <div class="layer-control-bar" id="layerControlBar" style="background: var(--bg-card-subtle); border-radius: var(--radius-sm); padding: 6px 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.74rem;">
+            <div class="layer-control-bar" id="layerControlBar" style="background: var(--bg-card-subtle); border-radius: var(--radius-sm); padding: 6px 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.74rem;">
               <span style="font-weight: 700; color: var(--text-muted);"><i class="fa-solid fa-sliders"></i> Layers:</span>
-              <label class="layer-toggle-btn active" id="lblLayerYolo">
+              <label class="layer-toggle-btn active" id="lblLayerYolo" title="Toggle YOLOv11 Object Detection Bounding Boxes">
                 <input type="checkbox" id="chkLayerYolo" checked>
                 <i class="fa-solid fa-vector-square" style="color: var(--emerald-600);"></i>
                 <span>YOLO Boxes</span>
               </label>
-              <label class="layer-toggle-btn active" id="lblLayerUnet">
+              <label class="layer-toggle-btn active" id="lblLayerUnet" title="Toggle Attention U-Net Pixel-Level Segmentation Masks">
                 <input type="checkbox" id="chkLayerUnet" checked>
                 <i class="fa-solid fa-draw-polygon" style="color: var(--purple-accent);"></i>
                 <span>U-Net Masks</span>
               </label>
-              <label class="layer-toggle-btn active" id="lblLayerFusion">
+              <label class="layer-toggle-btn active" id="lblLayerFusion" title="Toggle Dual-Model Consensus Fused Overlays">
                 <input type="checkbox" id="chkLayerFusion" checked>
                 <i class="fa-solid fa-cubes-stacked" style="color: var(--sky-blue);"></i>
                 <span>Fused</span>
               </label>
-              <label class="layer-toggle-btn active" id="lblLayerVerify">
+              <label class="layer-toggle-btn active" id="lblLayerVerify" title="Toggle Physics Verification Tag">
                 <input type="checkbox" id="chkLayerVerify" checked>
                 <i class="fa-solid fa-shield-halved" style="color: var(--emerald-500);"></i>
                 <span>Verification</span>
               </label>
-              <label class="layer-toggle-btn active" id="lblLayerIds">
+              <label class="layer-toggle-btn active" id="lblLayerIds" title="Toggle Target IDs & Priority Scores">
                 <input type="checkbox" id="chkLayerIds" checked>
                 <i class="fa-solid fa-tag" style="color: var(--amber-warn);"></i>
                 <span>Target IDs</span>
@@ -656,6 +656,35 @@
                   <i class="fa-solid fa-brain"></i>
                   <span>Retrain &amp; Calibrate YOLO / U-Net</span>
                 </button>
+              </div>
+            </div>
+
+            <!-- Model Calibration & Sensitivity Filter Strip -->
+            <div class="model-sensitivity-bar" id="modelSensitivityBar" style="background: rgba(3, 10, 22, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); padding: 5px 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.72rem;">
+              <span style="font-weight: 700; color: var(--emerald-400); display: flex; align-items: center; gap: 5px;">
+                <i class="fa-solid fa-gauge-high"></i> AI Sensitivity:
+              </span>
+              
+              <!-- YOLO Threshold Slider -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #94a3b8; font-weight: 600;">YOLO Conf:</span>
+                <input type="range" id="sliderYoloConf" min="20" max="95" value="45" style="width: 85px; accent-color: var(--emerald-500); cursor: pointer;" title="Adjust YOLO Object Detection Confidence Filter">
+                <span id="valYoloConf" style="font-family: var(--font-mono); font-weight: 700; color: var(--emerald-400); min-width: 32px;">45%</span>
+              </div>
+
+              <!-- U-Net Sensitivity Slider -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #94a3b8; font-weight: 600;">U-Net Mask Sens:</span>
+                <input type="range" id="sliderUnetSens" min="20" max="95" value="50" style="width: 85px; accent-color: var(--purple-accent); cursor: pointer;" title="Adjust Attention U-Net Semantic Segmentation Sensitivity">
+                <span id="valUnetSens" style="font-family: var(--font-mono); font-weight: 700; color: var(--purple-accent); min-width: 32px;">50%</span>
+              </div>
+
+              <!-- Preset Quick Selectors -->
+              <div style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
+                <span style="color: #64748b; font-size: 0.68rem; margin-right: 4px;">Preset:</span>
+                <button type="button" class="gis-btn" id="btnPresetHighRecall" style="padding: 1px 7px; font-size: 0.68rem;" title="High Recall: Lower thresholds to detect subtle, faint contacts">High Recall</button>
+                <button type="button" class="gis-btn active" id="btnPresetBalanced" style="padding: 1px 7px; font-size: 0.68rem;" title="Balanced: Optimum F1-score trade-off">Balanced</button>
+                <button type="button" class="gis-btn" id="btnPresetHighPrecision" style="padding: 1px 7px; font-size: 0.68rem;" title="High Precision: Strictly show confirmed high-contrast targets">High Precision</button>
               </div>
             </div>
 
@@ -2363,12 +2392,12 @@
   <script src="assets/vendor/leaflet/leaflet.js"></script>
 
   <!-- Application Scripts (Auth first, then API, Waterfall, Map, App, UI) -->
-  <script src="js/auth.js?v=20.0"></script>
-  <script src="js/api.js?v=20.0"></script>
-  <script src="js/waterfall.js?v=20.0"></script>
-  <script src="js/map.js?v=20.0"></script>
-  <script src="js/app.js?v=20.0"></script>
-  <script src="js/gis_ui.js?v=20.0"></script>
+  <script src="js/auth.js?v=21.0"></script>
+  <script src="js/api.js?v=21.0"></script>
+  <script src="js/waterfall.js?v=21.0"></script>
+  <script src="js/map.js?v=21.0"></script>
+  <script src="js/app.js?v=21.0"></script>
+  <script src="js/gis_ui.js?v=21.0"></script>
 
 </body>
 </html>

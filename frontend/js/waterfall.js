@@ -35,6 +35,10 @@ class WaterfallViewer {
       ids: true
     };
 
+    // Dynamic confidence and sensitivity thresholds
+    this.yoloConfThreshold = 0.45;
+    this.unetSensThreshold = 0.50;
+
     this.rawImage = null;
     this.enhancedImage = null;
     this.annotatedImage = null;
@@ -184,6 +188,27 @@ class WaterfallViewer {
       this.layers[layerName] = Boolean(isVisible);
       this.render();
     }
+  }
+
+  setThresholds({ yoloConf, unetSens } = {}) {
+    if (yoloConf !== undefined) this.yoloConfThreshold = Number(yoloConf);
+    if (unetSens !== undefined) this.unetSensThreshold = Number(unetSens);
+    this.render();
+  }
+
+  _isTargetActive(t) {
+    const srcCat = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
+    const hasYolo = t.sources ? t.sources.includes("yolo") : (srcCat !== "UNET_ONLY");
+    const hasUnet = t.sources ? t.sources.includes("unet") : (srcCat !== "YOLO_ONLY");
+    const conf = Number(t.confidence || t.calibrated_confidence || 0.85);
+
+    const yoloMin = this.yoloConfThreshold !== undefined ? this.yoloConfThreshold : 0.45;
+    const unetMin = this.unetSensThreshold !== undefined ? Math.max(0.20, 1.0 - this.unetSensThreshold * 0.7) : 0.45;
+
+    const passesYolo = hasYolo && (conf >= yoloMin);
+    const passesUnet = hasUnet && (conf >= unetMin);
+
+    return passesYolo || passesUnet;
   }
 
   _isImageValid(img) {
@@ -364,10 +389,11 @@ class WaterfallViewer {
     const coords = this._getTargetCanvasCoords(t, w, h);
     const { x1, y1, bw, bh } = coords;
 
-    if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
-      const isNorm = t.norm_polygon.every(pt => pt[0] <= 1.05 && pt[1] <= 1.05);
+    const rawPoly = t.customPolygon || t.norm_polygon || t.normPolygon;
+    if (rawPoly && Array.isArray(rawPoly) && rawPoly.length >= 3) {
+      const isNorm = rawPoly.every(pt => pt[0] <= 1.05 && pt[1] <= 1.05);
       if (isNorm) {
-        return t.norm_polygon.map(pt => ({
+        return rawPoly.map(pt => ({
           x: Math.max(0, Math.min(w, pt[0] * w)),
           y: Math.max(0, Math.min(h, pt[1] * h))
         }));
@@ -471,28 +497,21 @@ class WaterfallViewer {
       return;
     }
 
+    // Filter active targets based on dynamic thresholds
+    const activeTargets = this.targets.filter(t => this._isTargetActive(t));
+
     // 2. Render U-Net / Fusion Pixel-Level Segmentation & Node Dots
-    this.targets.forEach(t => {
+    activeTargets.forEach(t => {
       const isSelected = (t.object_id === this.selectedTargetId);
       const poly = this._getPolygonCanvasCoords(t, w, h);
       if (!poly || poly.length < 3) return;
 
-      // (A) Fused Boundaries Translucent Fill Mask
-      if (this.layers.fusion) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(poly[0].x, poly[0].y);
-        for (let i = 1; i < poly.length; i++) {
-          ctx.lineTo(poly[i].x, poly[i].y);
-        }
-        ctx.closePath();
-        ctx.fillStyle = isSelected ? "rgba(0, 255, 128, 0.32)" : "rgba(0, 240, 255, 0.24)";
-        ctx.fill();
-        ctx.restore();
-      }
+      const srcCategory = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
+      const hasUnet = t.sources ? t.sources.includes("unet") : (srcCategory !== "YOLO_ONLY");
+      const isFused = (srcCategory === "BOTH") || (t.sources && t.sources.includes("yolo") && t.sources.includes("unet"));
 
-      // (B) U-Net Crisp Perimeter Contour Lines & Keypoint Node Dots
-      if (this.layers.unet) {
+      // Render U-Net Segmentation Mask whenever unet layer is active OR fusion layer is active
+      if ((this.layers.unet && hasUnet) || (this.layers.fusion && isFused)) {
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(poly[0].x, poly[0].y);
@@ -500,31 +519,61 @@ class WaterfallViewer {
           ctx.lineTo(poly[i].x, poly[i].y);
         }
         ctx.closePath();
-        ctx.lineWidth = isSelected ? 2.8 : 2.0;
-        ctx.strokeStyle = isSelected ? "#00e676" : "#00f0ff";
-        ctx.shadowColor = isSelected ? "#00e676" : "#00f0ff";
-        ctx.shadowBlur = isSelected ? 12 : 6;
+
+        // 1. Solid Luminous Acoustic Mask Fill (Strictly visible)
+        ctx.fillStyle = isSelected 
+          ? "rgba(0, 255, 136, 0.42)" 
+          : (srcCategory === "UNET_ONLY" ? "rgba(192, 132, 252, 0.32)" : "rgba(0, 240, 255, 0.28)");
+        ctx.fill();
+
+        // 2. Crisp Glowing Perimeter Boundary Contour
+        const strokeColor = isSelected ? "#00e676" : (srcCategory === "UNET_ONLY" ? "#c084fc" : "#00f0ff");
+        ctx.lineWidth = isSelected ? 3.5 : 2.4;
+        ctx.strokeStyle = strokeColor;
+        ctx.shadowColor = strokeColor;
+        ctx.shadowBlur = isSelected ? 16 : 8;
         ctx.stroke();
 
-        // Draw clean subtle vertex dots only when target is selected for inspection
-        if (isSelected) {
-          for (let i = 0; i < poly.length; i += 2) {
-            const pt = poly[i];
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 3.2, 0, Math.PI * 2);
-            ctx.fillStyle = "#00e676";
-            ctx.fill();
-            ctx.lineWidth = 1.0;
-            ctx.strokeStyle = "#ffffff";
-            ctx.stroke();
-          }
+        // 3. Vertex Node Dots along the contour for selected target or when U-Net layer is active
+        const step = isSelected ? 1 : 2;
+        for (let i = 0; i < poly.length; i += step) {
+          const pt = poly[i];
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, isSelected ? 3.6 : 2.4, 0, Math.PI * 2);
+          ctx.fillStyle = isSelected ? "#00e676" : (srcCategory === "UNET_ONLY" ? "#c084fc" : "#00f0ff");
+          ctx.fill();
+          ctx.lineWidth = 1.0;
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
         }
+
+        // 4. Clean U-Net Segmentation Tag Badge (shown when selected or when YOLO layer is off)
+        if (isSelected || !this.layers.yolo) {
+          const minYPt = poly.reduce((minP, p) => p.y < minP.y ? p : minP, poly[0]);
+          const uBadgeText = "U-NET SEGMENTATION";
+          ctx.font = "bold 9px 'JetBrains Mono', monospace";
+          const uBadgeW = ctx.measureText(uBadgeText).width + 8;
+          const uBadgeX = Math.max(4, Math.min(w - uBadgeW - 4, minYPt.x - uBadgeW / 2));
+          const uBadgeY = Math.max(14, minYPt.y - 6);
+
+          ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+          ctx.fillRect(uBadgeX, uBadgeY - 10, uBadgeW, 12);
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(uBadgeX, uBadgeY - 10, uBadgeW, 12);
+          ctx.fillStyle = strokeColor;
+          ctx.fillText(uBadgeText, uBadgeX + 4, uBadgeY - 1);
+        }
+
         ctx.restore();
       }
     });
 
-    // 3. Render YOLO Bold Green Bounding Boxes & Magenta Label Tags
-    this.targets.forEach(t => {
+    // Store interactive hit areas for precise canvas click / hover interaction
+    this._targetHitBoxes = [];
+
+    // 3. Render YOLO Bold Green Bounding Boxes
+    activeTargets.forEach(t => {
       const coords = this._getTargetCanvasCoords(t, w, h);
       const { x1, y1, bw, bh } = coords;
 
@@ -532,10 +581,10 @@ class WaterfallViewer {
       const srcCategory = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
       const hasYolo = t.sources ? t.sources.includes("yolo") : (srcCategory !== "UNET_ONLY");
 
-      // Draw YOLO Bold Green Bounding Box
-      if (this.layers.yolo && (hasYolo || this.layers.fusion || this.layers.unet)) {
+      // Draw YOLO Bold Green Bounding Box strictly when yolo layer is active AND target has yolo provenance
+      if (this.layers.yolo && hasYolo) {
         ctx.save();
-        ctx.lineWidth = isSelected ? 3.5 : 2.8;
+        ctx.lineWidth = isSelected ? 3.5 : 2.6;
         ctx.strokeStyle = "#00e676"; // Bright Neon Green
         ctx.shadowColor = "#00e676";
         ctx.shadowBlur = isSelected ? 16 : 8;
@@ -550,73 +599,223 @@ class WaterfallViewer {
         ctx.moveTo(x1, y1 + bh - cLen); ctx.lineTo(x1, y1 + bh); ctx.lineTo(x1 + cLen, y1 + bh);
         ctx.moveTo(x1 + bw - cLen, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh - cLen);
         ctx.stroke();
+        ctx.restore();
+      }
+    });
 
-        // Magenta Label Pill Badge
-        const confPct = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
-        const cleanClass = (t.class_display || t.class || "debris").replace(/_/g, " ").toUpperCase();
-        const provBadge = srcCategory === "BOTH" ? " [YOLO+U-NET]" : (srcCategory === "UNET_ONLY" ? " [U-NET]" : " [YOLO]");
-        const badgeText = `${cleanClass} ${confPct}%${provBadge}`;
+    // 4. Smart Collision-Free HUD Label Cards & Badges (Matching Reference Standards)
+    const placedBoxes = [];
+    let lastRightBottomY = 0;
+
+    activeTargets.forEach(t => {
+      const coords = this._getTargetCanvasCoords(t, w, h);
+      const { x1, y1, bw, bh } = coords;
+      const x2 = x1 + bw;
+      const y2 = y1 + bh;
+
+      const isSelected = (t.object_id === this.selectedTargetId);
+      const srcCategory = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
+      const hasYolo = t.sources ? t.sources.includes("yolo") : (srcCategory !== "UNET_ONLY");
+
+      // Label text & sizing
+      const confPct = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
+      const cleanClass = (t.class_display || t.class || "debris").replace(/_/g, " ").toUpperCase();
+      const provBadge = (srcCategory === "BOTH" || (t.sources && t.sources.includes("yolo") && t.sources.includes("unet"))) ? " [YOLO+U-NET]" : (srcCategory === "UNET_ONLY" ? " [U-NET]" : " [YOLO]");
+      const badgeText = `${cleanClass} ${confPct}%${provBadge}`;
+
+      ctx.font = "bold 11px 'JetBrains Mono', monospace";
+      const tagW = ctx.measureText(badgeText).width + 16;
+      const tagH = 22;
+
+      // ID Badge details
+      const prioScore = t.priority_score || 85;
+      const prioLevel = t.priority_level || (t.risk_score || "HIGH");
+      const idText = `${t.object_id} — ${prioScore} — ${prioLevel}`;
+      ctx.font = "bold 10px 'JetBrains Mono', monospace";
+      const idW = ctx.measureText(idText).width + 12;
+      const idH = 16;
+      const prioCol = (prioScore >= 81) ? "#ff3366" : ((prioScore >= 61) ? "#ff9100" : "#00f0ff");
+
+      // Verification Badge details
+      const vStatus = t.verification_status || "confirmed";
+      const isConfirmed = (vStatus === "confirmed");
+      const vBadgeColor = isConfirmed ? "#00e676" : "#ffab00";
+      const vBadgeText = isConfirmed ? "CONFIRMED" : "SUSPICIOUS";
+      ctx.font = "bold 9px 'JetBrains Mono', monospace";
+      const vW = ctx.measureText(vBadgeText).width + 10;
+      const vH = 16;
+
+      const labelPos = t.label_pos || t.labelPos || {};
+      const isRightSide = (labelPos.side === "right");
+
+      let cardX, cardY;
+
+      if (isRightSide) {
+        // Offset to the right in clean vertical column with leader line (Image 2 standard)
+        cardX = Math.max(x2 + 22, Math.round(w * 0.38));
+        if (labelPos.alignX !== undefined) {
+          cardX = Math.round(labelPos.alignX * w);
+        }
+
+        let targetY = (labelPos.alignY !== undefined) ? (labelPos.alignY * h - tagH / 2) : (y1 + bh * 0.45 - tagH / 2);
+        // Ensure no overlap with prior right-side label
+        if (targetY < lastRightBottomY + 8) {
+          targetY = lastRightBottomY + 8;
+        }
+        cardY = Math.max(10, Math.min(h - tagH - 24, Math.round(targetY)));
+        lastRightBottomY = cardY + tagH + idH + 4;
+
+        // Leader line from target contact to label pill
+        ctx.save();
+        const leaderStroke = isSelected ? "#00e676" : "#00f0ff";
+        ctx.strokeStyle = leaderStroke;
+        ctx.lineWidth = isSelected ? 2.2 : 1.5;
+        ctx.shadowColor = leaderStroke;
+        ctx.shadowBlur = isSelected ? 10 : 5;
+
+        const anchorX = x2;
+        const anchorY = y1 + Math.min(bh * 0.5, 20);
+
+        // Anchor node dot on bbox edge
+        ctx.beginPath();
+        ctx.arc(anchorX, anchorY, 3.2, 0, Math.PI * 2);
+        ctx.fillStyle = leaderStroke;
+        ctx.fill();
+
+        // Connector path: subtle horizontal dogleg
+        ctx.beginPath();
+        ctx.moveTo(anchorX, anchorY);
+        const midX = anchorX + 14;
+        ctx.lineTo(midX, anchorY);
+        ctx.lineTo(cardX - 4, cardY + tagH / 2);
+        ctx.stroke();
+        ctx.restore();
+
+      } else {
+        // Standard top placement with collision avoidance
+        let candX = Math.max(4, Math.min(w - tagW - 4, x1));
+        let candY = y1 - tagH - 4;
+
+        if (candY < 6) {
+          candY = y1 + bh + 4; // if near top, flip below
+        }
+
+        // Detect collisions with previously placed boxes
+        for (let i = 0; i < placedBoxes.length; i++) {
+          const pb = placedBoxes[i];
+          const overlapX = candX < pb.x + pb.w && candX + tagW > pb.x;
+          const overlapY = candY < pb.y + pb.h && candY + tagH > pb.y;
+          if (overlapX && overlapY) {
+            // Shift vertically to avoid overlap
+            candY = pb.y - tagH - 4;
+            if (candY < 6) {
+              candY = pb.y + pb.h + 4;
+            }
+          }
+        }
+        cardX = candX;
+        cardY = candY;
+      }
+
+      // Record bounds for hit-testing and collision detection
+      const totalCardW = Math.max(tagW, idW + vW + 8);
+      const totalCardH = tagH + (this.layers.ids || this.layers.verify ? idH + 4 : 0);
+      placedBoxes.push({ x: cardX, y: cardY, w: totalCardW, h: totalCardH });
+      this._targetHitBoxes.push({
+        id: t.object_id,
+        bbox: { x1, y1, x2, y2 },
+        card: { x1: cardX, y1: cardY, x2: cardX + totalCardW, y2: cardY + totalCardH }
+      });
+
+      // 1. Draw Magenta Label Pill (when YOLO layer active)
+      if (this.layers.yolo && hasYolo) {
+        ctx.save();
+        ctx.fillStyle = "#e00080";
+        ctx.fillRect(cardX, cardY, tagW, tagH);
+
+        ctx.strokeStyle = isSelected ? "#00e676" : "#ffffff";
+        ctx.lineWidth = isSelected ? 2 : 1;
+        if (isSelected) {
+          ctx.shadowColor = "#00e676";
+          ctx.shadowBlur = 10;
+        }
+        ctx.strokeRect(cardX, cardY, tagW, tagH);
 
         ctx.font = "bold 11px 'JetBrains Mono', monospace";
-        const tagW = ctx.measureText(badgeText).width + 16;
-        const tagH = 22;
-        const tagY = Math.max(0, y1 - tagH + 2);
-
-        ctx.fillStyle = "#e00080";
-        ctx.fillRect(x1, tagY, tagW, tagH);
-
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x1, tagY, tagW, tagH);
-
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(badgeText, x1 + 8, tagY + 15);
-
+        ctx.shadowBlur = 0;
+        ctx.fillText(badgeText, cardX + 8, cardY + 15);
         ctx.restore();
       }
 
-      // Draw Verification Indicator Badge
-      if (this.layers.verify) {
-        ctx.save();
-        const vStatus = t.verification_status || "confirmed";
-        const isConfirmed = (vStatus === "confirmed");
-        const badgeColor = isConfirmed ? "#00e676" : "#ffab00";
-        const badgeText = isConfirmed ? "VERIFIED" : "SUSPICIOUS";
+      // 2. Draw ID Badge and Verification Badge
+      if (isRightSide) {
+        // In right-side offset mode, render ID Badge and Verification Badge directly below the magenta pill
+        const subY = cardY + tagH + 3;
 
-        ctx.font = "bold 9px 'JetBrains Mono', monospace";
-        const bWidth = ctx.measureText(badgeText).width + 8;
-        ctx.fillStyle = "rgba(10, 15, 26, 0.92)";
-        ctx.fillRect(x1 + bw - bWidth - 2, y1 + bh - 16, bWidth, 14);
-        ctx.strokeStyle = badgeColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x1 + bw - bWidth - 2, y1 + bh - 16, bWidth, 14);
-        ctx.fillStyle = badgeColor;
-        ctx.fillText(badgeText, x1 + bw - bWidth + 2, y1 + bh - 6);
-        ctx.restore();
-      }
-
-      // Draw Target IDs and Priority / Risk Level
-      if (this.layers.ids) {
-        ctx.save();
-        const prioScore = t.priority_score || 85;
-        const prioLevel = t.priority_level || (t.risk_score || "HIGH");
-        const label = `${t.object_id} — ${prioScore} — ${prioLevel}`;
-
-        ctx.font = "bold 10px 'JetBrains Mono', monospace";
-        const textW = ctx.measureText(label).width;
-        const idY = y1 + bh + 14;
-
-        if (idY < h) {
-          const badgeCol = (prioScore >= 81) ? "#ff3366" : ((prioScore >= 61) ? "#ff9100" : "#00f0ff");
+        if (this.layers.ids && subY + idH <= h) {
+          ctx.save();
           ctx.fillStyle = "rgba(4, 10, 24, 0.94)";
-          ctx.fillRect(x1, y1 + bh + 2, textW + 10, 16);
-          ctx.strokeStyle = badgeCol;
+          ctx.fillRect(cardX, subY, idW, idH);
+          ctx.strokeStyle = prioCol;
           ctx.lineWidth = 1;
-          ctx.strokeRect(x1, y1 + bh + 2, textW + 10, 16);
-          ctx.fillStyle = badgeCol;
-          ctx.fillText(label, x1 + 5, y1 + bh + 14);
+          ctx.strokeRect(cardX, subY, idW, idH);
+
+          ctx.font = "bold 10px 'JetBrains Mono', monospace";
+          ctx.fillStyle = prioCol;
+          ctx.fillText(idText, cardX + 6, subY + 12);
+          ctx.restore();
         }
-        ctx.restore();
+
+        if (this.layers.verify && subY + vH <= h) {
+          ctx.save();
+          const vX = cardX + (this.layers.ids ? idW + 4 : 0);
+          ctx.fillStyle = "rgba(10, 15, 26, 0.92)";
+          ctx.fillRect(vX, subY, vW, vH);
+          ctx.strokeStyle = vBadgeColor;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(vX, subY, vW, vH);
+
+          ctx.font = "bold 9px 'JetBrains Mono', monospace";
+          ctx.fillStyle = vBadgeColor;
+          ctx.fillText(vBadgeText, vX + 5, subY + 12);
+          ctx.restore();
+        }
+      } else {
+        // Top placement: ID below bounding box, Verification inside bottom-right or top-right
+        if (this.layers.ids) {
+          ctx.save();
+          let idY = y1 + bh + 3;
+          if (idY + idH > h) idY = y1 - idH - 2;
+
+          ctx.fillStyle = "rgba(4, 10, 24, 0.94)";
+          ctx.fillRect(x1, idY, idW, idH);
+          ctx.strokeStyle = prioCol;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x1, idY, idW, idH);
+
+          ctx.font = "bold 10px 'JetBrains Mono', monospace";
+          ctx.fillStyle = prioCol;
+          ctx.fillText(idText, x1 + 6, idY + 12);
+          ctx.restore();
+        }
+
+        if (this.layers.verify) {
+          ctx.save();
+          const vX = Math.max(x1, x1 + bw - vW - 3);
+          const vY = (bh >= 36) ? (y1 + bh - 18) : (y1 + 3);
+
+          ctx.fillStyle = "rgba(10, 15, 26, 0.92)";
+          ctx.fillRect(vX, vY, vW, vH);
+          ctx.strokeStyle = vBadgeColor;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(vX, vY, vW, vH);
+
+          ctx.font = "bold 9px 'JetBrains Mono', monospace";
+          ctx.fillStyle = vBadgeColor;
+          ctx.fillText(vBadgeText, vX + 5, vY + 12);
+          ctx.restore();
+        }
       }
     });
 
@@ -636,6 +835,17 @@ class WaterfallViewer {
     };
 
     const findHitTarget = (pt) => {
+      if (this._targetHitBoxes && this._targetHitBoxes.length > 0) {
+        const hit = this._targetHitBoxes.find(hb => {
+          const inBbox = pt.worldX >= hb.bbox.x1 && pt.worldX <= hb.bbox.x2 && pt.worldY >= hb.bbox.y1 && pt.worldY <= hb.bbox.y2;
+          const inCard = hb.card && pt.worldX >= hb.card.x1 && pt.worldX <= hb.card.x2 && pt.worldY >= hb.card.y1 && pt.worldY <= hb.card.y2;
+          return inBbox || inCard;
+        });
+        if (hit) {
+          const found = this.targets.find(t => t.object_id === hit.id);
+          if (found) return found;
+        }
+      }
       return this.targets.find(t => {
         const coords = this._getTargetCanvasCoords(t, this.canvas.width, this.canvas.height);
         return pt.worldX >= coords.x1 && pt.worldX <= coords.x2 && pt.worldY >= coords.y1 && pt.worldY <= coords.y2;

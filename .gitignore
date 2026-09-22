@@ -83,4 +83,24 @@ backend/scratch/*
 Thumbs.db
 .vscode/
 .idea/
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
 
+# Environment secrets
+.env
+
+# Large datasets
+backend/datasets/
+datasets/
+
+# Trained model/checkpoint files
+backend/models/checkpoints/
+*.pt
+*.pth
+*.onnx
+
+# Temporary outputs
+outputs/
