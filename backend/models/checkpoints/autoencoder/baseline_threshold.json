@@ -1,8 +1,15 @@
 {
+<<<<<<< HEAD
   "model_checkpoint": "C:\\Users\\santo\\.gemini\\antigravity-ide\\scratch\\SIH57\\models\\checkpoints\\autoencoder\\baseline_autoencoder.pt",
   "threshold_3sigma": 0.094049,
   "normal_seabed_mu": 0.062424,
   "normal_seabed_sigma": 0.010542,
+=======
+  "model_checkpoint": "C:\\Users\\santo\\Desktop\\sih\\sea-sentinel\\backend\\models\\checkpoints\\autoencoder\\baseline_autoencoder.pt",
+  "threshold_3sigma": 0.106143,
+  "normal_seabed_mu": 0.072303,
+  "normal_seabed_sigma": 0.01128,
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   "training_samples": 22,
   "validation_samples": 10,
   "latent_dim": 128,
@@ -13,6 +20,7 @@
   "history": [
     {
       "epoch": 1,
+<<<<<<< HEAD
       "train_mse": 0.125749,
       "val_mse": 0.079691
     },
@@ -110,6 +118,20 @@
       "epoch": 20,
       "train_mse": 0.059874,
       "val_mse": 0.062424
+=======
+      "train_mse": 0.126386,
+      "val_mse": 0.072384
+    },
+    {
+      "epoch": 2,
+      "train_mse": 0.113635,
+      "val_mse": 0.072324
+    },
+    {
+      "epoch": 3,
+      "train_mse": 0.101916,
+      "val_mse": 0.072303
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     }
   ]
 }

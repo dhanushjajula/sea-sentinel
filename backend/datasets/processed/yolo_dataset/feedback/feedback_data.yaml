@@ -4,6 +4,10 @@ names:
   2: shipwreck_fragment
   3: engine_debris
   4: riprap_debris
+<<<<<<< HEAD
 path: C:\Users\Jagadeesh\OneDrive\Desktop\sih_2026\sea-sentinel\backend\datasets\processed\yolo_dataset\feedback
+=======
+path: C:\Users\jaish\.gemini\antigravity-ide\scratch\sea-sentinel\sea-sentinel\backend\datasets\processed\yolo_dataset\feedback
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 train: images/train
 val: images/val

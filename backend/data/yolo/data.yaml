@@ -1,5 +1,9 @@
 # YOLOv11 Sonar Debris Detection Dataset
+<<<<<<<< HEAD:backend/data/yolo/data.yaml
 path: C:/Users/jaish/.gemini/antigravity-ide/scratch/sea-sentinel/sea-sentinel/data/yolo
+========
+path: .
+>>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f:backend/datasets/processed/yolo_dataset/data.yaml
 train: images/train
 val: images/val
 test: images/test

@@ -1,7 +1,11 @@
 """Debris Risk Scoring API Routes."""
 from fastapi import APIRouter
 from pydantic import BaseModel
+<<<<<<< HEAD
 from backend.debris_risk_scoring.services.risk_engine_service import DebrisRiskScoringService
+=======
+from backend.debris-risk-scoring.services.risk_engine_service import DebrisRiskScoringService
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 router = APIRouter(prefix="/debris-risk", tags=["Debris Risk Scoring"])
 risk_service = DebrisRiskScoringService()

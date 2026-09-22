@@ -36,16 +36,25 @@ ENV/
 !.env.example
 backend/.env
 
+<<<<<<< HEAD
 
 # Large dataset raw rasters, GeoTIFFs, and models
+=======
+# Large dataset raw rasters and models
+backend/datasets/raw/*
+!backend/datasets/raw/.gitkeep
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 datasets/raw/*
 !datasets/raw/.gitkeep
 backend/datasets/raw/*
 !backend/datasets/raw/.gitkeep
 *.tif
 *.tiff
+!backend/datasets/samples/*.tif
+!backend/datasets/samples/*.tiff
 *.zip
 *.parquet
+<<<<<<< HEAD
 *.pt
 !backend/yolo11n.pt
 *.pth
@@ -61,6 +70,18 @@ backend/models/checkpoints/**/*.pth
 backend/models/checkpoints/**/*.onnx
 
 # Outputs and temporary logs / databases / uploads
+=======
+**/models/checkpoints/*.pt
+**/models/checkpoints/*.pth
+**/models/checkpoints/*.onnx
+**/models/checkpoints/**/*.pt
+**/models/checkpoints/**/*.pth
+**/models/checkpoints/**/*.onnx
+
+# Outputs and temporary logs
+backend/outputs/*
+!backend/outputs/.gitkeep
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 outputs/*
 !outputs/.gitkeep
 backend/outputs/*
@@ -75,14 +96,20 @@ backend/logs/*
 backend/runs/*
 backend/scratch/*
 *.log
+<<<<<<< HEAD
 *.db
 *.sqlite
+=======
+*.sqlite
+*.db
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 # IDE & OS files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+<<<<<<< HEAD
 # Python virtual environment
 .venv/
 venv/
@@ -104,3 +131,7 @@ backend/models/checkpoints/
 
 # Temporary outputs
 outputs/
+=======
+*.cache
+yolo11n.pt
+>>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
