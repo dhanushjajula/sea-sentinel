@@ -1,4 +1,4 @@
-# Sea Sentinel 2.0 — AI-Powered Automated Underwater Marine Debris & Anomaly Detection System
+# SIH26057 — AI-Powered Automated Underwater Marine Debris & Anomaly Detection System
 
 **Organisation:** Ministry of Earth Sciences (MoES) — National Institute of Ocean Technology (NIOT)  
 **Problem Statement ID:** SIH26057  
@@ -6,204 +6,182 @@
 
 ---
 
-## 1. System Architecture Flow
+## 1. Project Overview
 
-```text
-User / AUV Telemetry
-         │
-         ▼
-[Frontend UI Dashboard] (Dual Waterfall, GIS Leaflet Map, Inspection Tables)
-         │  HTTP REST
-         ▼
-[FastAPI Backend Router Aggregator] (/api/v2/...)
-         │
-         ▼
-[AI / ML Processing Core]
- ├── Sonar Preprocessing (Lee Speckle Filter + CLAHE Contrast Boost)
- ├── YOLO Detection (Fast Candidate Proposal Bounding Boxes)
- └── U-Net Semantic Segmentation (Pixel-Level Geometric Masks)
-         │
-         ▼
-[Feature Processing Modules]
- ├── Geolocation Engine (Case A: Affine GeoTransform | Case B: Slant Range Navigation Math)
- ├── Debris Risk Priority Engine (Hazard Scoring & Solidity Analysis)
- ├── Natural vs. Man-Made Classifier (Autoencoder Anomaly Detection & Rock Cluster Filter)
- ├── Duplicate Detection (Multi-Frame Trajectory Correlation & Deduplication)
- ├── Debris Density Engine (Spatial Concentration Index & Heatmaps)
- └── Sonar Quality Evaluator (Speckle Index, ENL Gain & SNR Metrics)
-         │
-         ▼
-[Database Persistence & Reporting] (SQLite Audit Log, GeoJSON, CSV & Visual Overlays)
-         │
-         ▼
-[Interactive Dashboard Viewers]
-```
+Side-Scan Sonar (SSS), towed behind research vessels or mounted on Autonomous Underwater Vehicles (AUVs), acoustically maps the seafloor to detect lost fishing gear ("ghost nets"), sunken pipelines/cables, shipwrecks, and hazardous anthropogenic debris. Manual acoustic log inspection across thousands of nautical miles is tedious, slow, and error-prone due to high speckle noise, varying pixel resolutions, and natural acoustic shadows.
+
+This project delivers an end-to-end, production-quality system built around four mandated deliverables:
+1. **Object Detection & Semantic Segmentation Core:** Domain-aware candidate extraction (YOLOv11) and pixel-level region refinement (Standard U-Net & Attention U-Net).
+2. **Confidence Scoring & Noise Filtering Module:** Acoustic shadow-highlight geometric pairing and Autoencoder-based anomaly filtering to eliminate rock clusters, sand ripples, and speckle noise.
+3. **Anomalous Reporting & Geotagging Engine:** Deterministic location determination (Case A: Affine GeoTransform; Case B: Sonar geometry + Navigation log), dimension estimation (length, width, area), and JSON/CSV reporting.
+4. **Interactive Dashboard:** Modern UI displaying sonar waterfall overlays, detection tables, Leaflet/Mapbox geospatial mapping, and automated PDF/CSV reports.
 
 ---
 
-## 2. Modular Project Directory Structure
+## 2. Implementation Progress & Roadmap
 
-```text
-sea-sentinel/
-├── frontend/                                   # Client-Side Application
-│   ├── index.html                              # Main UI Dashboard Entry Point
-│   ├── dashboard/                              # Main Dashboard Page & Subcomponents
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── services/
-│   ├── authentication/                         # User Auth & Session UI
-│   ├── debris-detection/                       # YOLO Detection Table & Inspectors
-│   ├── sonar-image-processing/                 # Denoising & CLAHE Controls
-│   ├── geolocation/                            # Leaflet GIS Map Component
-│   ├── debris-risk-scoring/                    # Risk Badge & Priority Views
-│   ├── natural-manmade-classification/         # Anomaly & Rock Field Classifier UI
-│   ├── duplicate-detection/                    # Multi-Frame Track Views
-│   ├── debris-density/                         # Spatial Density Heatmap
-│   ├── sonar-quality/                          # Quality Scoring & SNR Indicator
-│   ├── visualization/                          # Dual Waterfall & Composite Renderers
-│   └── shared/                                 # Shared Assets, Styles & API Client
-│       ├── assets/
-│       ├── css/
-│       ├── js/
-│       └── utils/
-│
-├── backend/                                    # Server-Side Application
-│   ├── app/                                    # FastAPI App Entry Point
-│   │   └── main.py
-│   ├── api/                                    # Central API Router Aggregator
-│   │   ├── routes.py
-│   │   └── middleware.py
-│   ├── authentication/                         # Auth Services & API Security
-│   ├── debris-detection/                       # YOLO Object Detection Engine
-│   ├── sonar-image-processing/                 # Speckle Filter & Radiometric CLAHE
-│   ├── geolocation/                            # WGS84 Transformation & Nav Math
-│   ├── debris-risk-scoring/                    # Priority Scoring & Morphometrics
-│   ├── natural-manmade-classification/         # Autoencoder & DBSCAN Rock Filter
-│   ├── duplicate-detection/                    # Multi-Frame Trajectory Correlator
-│   ├── debris-density/                         # Spatial Density Estimator
-│   ├── sonar-quality/                          # Speckle Index & Quality Evaluator
-│   ├── visualization/                          # Overlay Generator & Waterfall Slices
-│   ├── models/                                 # Neural Network Architectures
-│   │   ├── unet_models.py                      (Attention U-Net)
-│   │   └── autoencoder_models.py               (CNN Autoencoder)
-│   ├── database/                               # SQLite DB & Audit Logging
-│   │   ├── connection.py
-│   │   └── audit_logger.py
-│   └── shared/                                 # Shared Configs, Types & Utils
-│       ├── config/
-│       ├── types/
-│       └── utils/
-│
-├── notebooks/                                  # ML Research & Training Notebooks
-│   ├── eda/                                    # Comprehensive Exploratory Data Analysis
-│   │   └── project_eda_deep_dive.ipynb
-│   ├── yolo/                                   # Complete 26-Stage YOLO Workflow
-│   │   ├── data-preparation/
-│   │   ├── preprocessing/
-│   │   ├── training/
-│   │   ├── validation/
-│   │   ├── testing/
-│   │   └── evaluation/
-│   ├── unet/                                   # Complete 24-Stage U-Net Workflow
-│   │   ├── data-preparation/
-│   │   ├── preprocessing/
-│   │   ├── training/
-│   │   ├── validation/
-│   │   ├── testing/
-│   │   └── evaluation/
-│   ├── project-analysis/                       # Scientific Ablation & Benchmarks
-│   └── experiments/                            # Model Checkpoint Logs
-│
-├── logs/                                       # Multi-Stream Centralized Logging
-│   ├── frontend/
-│   ├── backend/
-│   ├── model-training/
-│   ├── model-predictions/
-│   └── errors/
-│
-├── data/                                       # Separated Dataset Repository
-│   ├── raw/
-│   ├── processed/
-│   ├── yolo/
-│   ├── unet/
-│   └── samples/
-│
-├── models/                                     # Trained Checkpoint Weights
-│   ├── yolo/                                   (best.pt, last.pt, yolo11n.pt)
-│   ├── unet/                                   (attention_unet_best.pt)
-│   └── autoencoder/                            (baseline_autoencoder.pt)
-│
-├── configs/                                    # System & Pipeline YAML Configs
-│   ├── pipeline_config.yaml
-│   ├── system_config.yaml
-│   ├── preprocessing_config.yaml
-│   ├── yolo_config.yaml
-│   ├── unet_config.yaml
-│   ├── anomaly_config.yaml
-│   └── geospatial_config.yaml
-│
-├── tests/                                      # Full Test Suite
-├── scripts/                                    # Operational & Execution CLI Scripts
-├── reload_servers.bat                          # One-Click Full Stack Launcher (Windows)
-├── reload_servers.ps1                          # PowerShell Server Manager
-├── requirements.txt                            # Python Package Dependencies
-└── README.md                                   # Project Documentation
-```
-
----
-
-## 3. Quick Start & Execution
-
-### Prerequisites
-* Python 3.10+
-* CUDA-compatible GPU (optional, automatic CPU fallback included)
-
-### 1. Installation
-```powershell
-pip install -r requirements.txt
-```
-
-### 2. Launching Full-Stack Application
-```powershell
-.\reload_servers.ps1
-```
-* **Frontend Web Dashboard:** `http://localhost:3000`
-* **FastAPI Backend OpenAPI Docs:** `http://localhost:8000/docs`
-
-### 3. Running Test Suite
-```powershell
-pytest tests/
-```
-
-### 4. Running the Complete Standalone Pipeline Script
-```powershell
-python scripts/run_pipeline.py --input test_fixtures/test_document.png
-```
-
----
-
-## 4. Key Machine Learning Benchmarks
-
-| Component | Model / Method | Primary Metric | Result |
+| Stage | Module | Status | Key Deliverables |
 |---|---|---|---|
-| **Candidate Detection** | Ultralytics YOLOv11 | $\text{mAP}@0.5$ / Precision | **0.9100 / 0.8900** |
-| **Region Segmentation** | Attention U-Net (PyTorch) | Dice Coefficient / IoU | **0.8742 / 0.7815** |
-| **Speckle Denoising** | Adaptive Lee Filter ($Cu=0.22$) | ENL Gain | **$1.28\times$ Gain** |
-| **Anomaly Filtering** | 3-Sigma Autoencoder ($T=0.094$) | False Positive Reduction | **$94.5\%$ Suppressed** |
-| **End-to-End Latency** | Parallel PyTorch + ONNX | Full Swath Inference | **~26 ms (~38 FPS)** |
+| **Stage 1** | **Dataset Preparation & Audit** | **COMPLETED** | Non-destructive audit (3,255 Zenodo chips, NOAA GeoTIFFs), inventory JSON, baseline isolation, YOLO split. |
+| **Stage 2** | **Sonar Preprocessing Pipeline** | **COMPLETED** | Lee speckle filter ($1.276\times$ ENL gain), CLAHE contrast boost, shadow-highlight extraction, high-res mosaic tiling ($640\times640$). |
+| **Stage 3** | **YOLO Debris Detection Core** | **COMPLETED** | YOLOv11 detection engine, training script, mAP evaluation, confusion matrix generator, batch inference CLI. |
+| **Stage 4** | **U-Net Semantic Segmentation** | **COMPLETED** | Standard U-Net & Attention U-Net with Attention Gates, BCEDiceLoss, FocalLoss, PatchTiler with cosine blending, dry-run & synthetic demo. |
+| **Stage 5** | **Anomaly Detection & Rock Suppression** | **COMPLETED** | CNN Autoencoder (Algorithms 1-9), 3-sigma threshold calibration ($T=0.094049$), DBSCAN rock field filter, Platt confidence calibration. |
+| **Stage 6** | **AI Agent / Orchestrator** | **COMPLETED** | Central SIHPipelineAgent coordinator, execution tracing with microsecond metrics, explainability narratives, SQLite audit persistence. |
+| **Stage 7** | **Dimension Estimation & Geotagging** | **COMPLETED** | Module 5 five-stage geotagging (Case A Affine & Case B Navigation math), PyProj WGS84 conversion, oriented contour dimension estimation. |
+| **Stage 8** | **Interactive UI Dashboard** | *Up Next* | Dual waterfall viewer, Leaflet GIS map, split-view detector/segmenter overlays, report exporter. |
+| **Stage 9** | **End-to-End System Verification** | *Pending* | Edge-case verification, FastAPI integration, final documentation. |
 
 ---
 
-## 5. API Endpoints Overview
+## 3. Architecture Flow
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/health` | `GET` | System health check and GPU diagnostics |
-| `/analyze` | `POST` | Full end-to-end parallel AI agent survey analysis |
-| `/api/v2/debris-detection/detect` | `POST` | Standalone YOLO candidate debris detection |
-| `/api/v2/sonar-processing/enhance` | `POST` | Standalone Lee Speckle + CLAHE enhancement |
-| `/api/v2/geolocation/tag` | `POST` | WGS84 coordinate calculation |
-| `/api/v2/debris-risk/score` | `POST` | Hazard and risk priority scoring |
-| `/api/v2/duplicate-detection/track`| `POST` | Multi-frame target tracking and deduplication |
-| `/api/v2/sonar-quality/evaluate` | `POST` | Backscatter and speckle quality assessment |
-| `/audit/recent` | `GET` | Historical SQLite survey inspection audits |
+```
+Side-Scan Sonar (SSS) Image / Survey Mosaic
+                   │
+                   ▼
+      [Input Validation & Ingestion]
+       ├── Format & corrupt file check
+       └── Raster metadata extraction (CRS, Transform, Resolution)
+                   │
+                   ▼
+       [Sonar Preprocessing Engine]
+       ├── Normalization & Grayscale standardization
+       ├── Speckle noise reduction (Lee filter / adaptive median)
+       └── CLAHE contrast enhancement & TVG normalization
+                   │
+                   ▼
+     [Acoustic Shadow-Highlight Pairing]
+       ├── Highlight extraction (backscatter peak)
+       └── Far-range acoustic shadow trailing verification
+                   │
+                   ▼
+         [YOLO Candidate Detection]
+       ├── YOLOv11 inference for candidate region proposals
+       └── Bounding box extraction & class confidence
+                   │
+                   ▼
+        [U-Net Region Segmentation]
+       ├── Attention U-Net with Oktay et al. Attention Gates
+       └── Patch-based sliding window with cosine seam blending
+                   │
+                   ▼
+  [Anomaly Detection & False-Positive Filtering]
+       ├── CNN Autoencoder Reconstruction Error (Algorithms 1-9)
+       ├── DBSCAN rock cluster suppression
+       └── Calibrated confidence scoring (Platt / Temperature scaling)
+                   │
+                   ▼
+  [Geospatial Engine & Dimension Estimation]
+       ├── Case A: Direct Affine Matrix Transform
+       ├── Case B: Navigation GPS + Slant-to-Ground Range Projection
+       ├── Lat/Lon conversion via PyProj (EPSG:4326 WGS84)
+       └── Physical length, width, and area metric calculation
+                   │
+                   ▼
+             [Risk Assessment]
+       └── Multi-factor risk scoring (debris category, size, confidence)
+                   │
+                   ▼
+          [AI Pipeline Agent]
+       ├── Traceable execution audit log
+       ├── Structured SQLite database persistence
+       └── Structured JSON / CSV report generation
+                   │
+                   ▼
+    [Full-Stack Interactive Dashboard]
+       ├── Dual Sonar Waterfall Viewer (Raw vs. Processed)
+       ├── Bounding box & mask overlays
+       ├── Leaflet / Mapbox interactive GIS map
+       └── Downloadable survey inspection reports
+```
+
+---
+
+## 4. Quickstart & Verification
+
+### Running the Complete Test Suite
+
+```bash
+# 1. Verify all core module boundaries & orchestrator
+python tests/test_skeletons.py
+
+# 2. Verify Stage 1 dataset outputs
+python tests/test_stage1_dataset.py
+
+# 3. Verify Stage 2 preprocessing pipeline (Lee filter, CLAHE, Tiler)
+python tests/test_stage2_preprocessing.py
+
+# 4. Verify Stage 3 YOLO detection core
+python tests/test_stage3_yolo.py
+
+# 5. Verify Stage 4 U-Net & Attention U-Net segmentation core
+python tests/test_stage4_segmentation.py
+
+# 6. Verify Stage 5 Anomaly Detection & False-Positive Filtering
+python tests/test_stage5_anomaly.py
+
+# 7. Verify Stage 6 AI Agent Orchestrator & Explainability
+python tests/test_stage6_agent.py
+
+# 8. Verify Stage 7 Dimension Estimation & Geotagging
+python tests/test_stage7_geospatial.py
+```
+
+### Stage 4: U-Net Training & Inference
+
+```bash
+# Dry run verification (validates architecture, shapes, gradient flow, audits dataset)
+python training/train_unet.py --dry-run
+
+# Run synthetic demonstration training
+python training/train_unet.py --synthetic-demo --epochs 3 --batch-size 8
+
+# Run evaluation on test chips
+python evaluation/evaluate_unet.py --checkpoint models/checkpoints/unet/attention_unet_best.pt --model attention_unet
+
+# Segment custom sonar imagery
+python inference/segment_debris.py --input <path_to_image_or_folder> --checkpoint models/checkpoints/unet/attention_unet_best.pt
+```
+
+### Stage 5: Anomaly Detection & False-Positive Filtering
+
+```bash
+# Dry run verification
+python training/train_autoencoder.py --dry-run
+
+# Train CNN Autoencoder on normal seabed baseline & calibrate 3-sigma threshold
+python training/train_autoencoder.py --epochs 20 --batch-size 8
+
+# Evaluate error separation between normal seabed and real debris
+python evaluation/evaluate_anomaly.py
+
+# Filter detections and calibrate confidence
+python inference/filter_anomalies.py
+```
+
+### Stage 6: End-to-End AI Agent Pipeline Execution
+
+```bash
+# Run end-to-end coordinated pipeline on single sonar image or directory
+python scripts/run_pipeline.py --input <path_to_image_or_mosaic>
+
+# Run batch survey analysis with CSV & JSON inspection report export
+python scripts/run_pipeline.py --input datasets/processed/yolo_dataset/images/test/ --output-dir outputs/reports/
+```
+
+### Stage 7: Geospatial Target Export (GeoJSON / Hydrographic CSV)
+
+```bash
+# Export georeferenced targets to GeoJSON (Leaflet/QGIS) and tabular CSV
+python scripts/export_geospatial_report.py --db-path outputs/audit/survey_audit.db --output-dir outputs/geospatial/
+```
+
+---
+
+## 5. Development Principles
+
+1. **Strict Data Integrity:** Real input images and rasters are never modified destructively. Missing annotations are honestly reported rather than fabricating synthetic data.
+2. **Clear Operational Separation:** REAL MODE (real weights and rasters) vs. DEMO MODE (controlled demonstration clearly identified).
+3. **Deterministic Geospatial Math:** Strict implementation of Case A Affine Transformation and Case B Dead-Reckoning Navigation Projection.
+4. **Credit-Efficient Step-by-Step Execution:** Systematic modular development with automated regression test coverage at each stage.

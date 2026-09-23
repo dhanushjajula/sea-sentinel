@@ -25,7 +25,6 @@ class RiskPriorityEngine:
 
         # 1. Configurable Hazard Weights by Debris Type
         raw_hw = risk_cfg.get("hazard_weights", {
-<<<<<<< HEAD
             "fishing_net": 92,        # Critical (wildlife entanglement, ghost fishing)
             "ghost_net": 94,          # Critical (wildlife entanglement, ghost fishing)
             "ghost_gear": 94,         # Critical
@@ -46,15 +45,6 @@ class RiskPriorityEngine:
             "tire_or_rubber": 52,
             "munitions_or_uxo": 99,
             "default": 65
-=======
-            "fishing_net": 90,        # Very High (wildlife entanglement, ghost fishing)
-            "shipwreck_fragment": 85, # High (navigation obstacle, structural hazard)
-            "engine_debris": 80,      # High (pollutant leaching, heavy snag hazard)
-            "pipeline_or_cable": 70,  # Medium-High (infrastructure risk, anchor snag)
-            "plastic_debris": 60,     # Medium (macroplastic, ecosystem degradation)
-            "riprap_debris": 45,      # Medium-Low (quarry stone, localized obstruction)
-            "default": 50
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         })
         self.hazard_weights = {}
         for k, v in raw_hw.items():
@@ -63,11 +53,7 @@ class RiskPriorityEngine:
                 clean_v = str(v).split("#")[0].strip()
                 self.hazard_weights[k] = float(clean_v)
             except Exception:
-<<<<<<< HEAD
                 self.hazard_weights[k] = 65.0
-=======
-                self.hazard_weights[k] = 50.0
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
         # 2. Configurable Priority Formula Weights
         self.priority_weights = risk_cfg.get("priority_formula_weights", {
@@ -80,15 +66,9 @@ class RiskPriorityEngine:
         # 3. Sonar Quality Reliability Modulation
         self.reliability_modulation = risk_cfg.get("reliability_modulation", {
             "optimal": 1.00,
-<<<<<<< HEAD
             "good": 0.98,
             "moderate": 0.92,
             "noisy": 0.85
-=======
-            "good": 0.95,
-            "moderate": 0.85,
-            "noisy": 0.75
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         })
 
         # 4. Area thresholds (sq meters)
@@ -99,21 +79,12 @@ class RiskPriorityEngine:
 
     def categorize_score(self, score: float) -> str:
         """Categorizes 0-100 score into standard 4-tier risk categories."""
-<<<<<<< HEAD
         if score >= 80.0:
             return "CRITICAL"
         elif score >= 60.0:
             return "HIGH"
         elif score >= 40.0:
             return "MODERATE"
-=======
-        if score >= 81.0:
-            return "CRITICAL"
-        elif score >= 61.0:
-            return "HIGH"
-        elif score >= 31.0:
-            return "MEDIUM"
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         else:
             return "LOW"
 
@@ -259,7 +230,6 @@ class RiskPriorityEngine:
         # -------------------------------------------------------------
         # 2. Debris Type Base Hazard
         # -------------------------------------------------------------
-<<<<<<< HEAD
         raw_val = None
         if raw_class in self.hazard_weights:
             raw_val = self.hazard_weights[raw_class]
@@ -275,13 +245,6 @@ class RiskPriorityEngine:
             base_hazard = float(raw_val)
         except Exception:
             base_hazard = 65.0
-=======
-        raw_val = self.hazard_weights.get(raw_class, self.hazard_weights.get("default", 50.0))
-        try:
-            base_hazard = float(raw_val)
-        except Exception:
-            base_hazard = 50.0
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         
         # Determine qualitative marine hazard impact
         if base_hazard >= 85.0:

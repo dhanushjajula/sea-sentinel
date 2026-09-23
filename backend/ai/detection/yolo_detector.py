@@ -68,7 +68,6 @@ class YOLODetector:
                 self.model = YOLO(self.model_path)
                 self.is_model_loaded = True
                 if hasattr(self.model, "names") and self.model.names:
-<<<<<<< HEAD
                     # Only overwrite classes if model was custom-trained with debris taxonomy (<= 15 classes)
                     if len(self.model.names) <= 15:
                         self.classes = {int(k): v for k, v in self.model.names.items()}
@@ -79,29 +78,17 @@ class YOLODetector:
             # Explicit path was specified but does not exist on disk
             print(f"[YOLODetector] Warning: Specified checkpoint path does not exist: {self.model_path}")
             self.is_model_loaded = False
-=======
-                    # Update classes if custom trained
-                    self.classes = {int(k): v for k, v in self.model.names.items()}
-            except Exception as e:
-                print(f"[YOLODetector] Warning: Failed to load weights from {self.model_path}: {e}")
-                self.is_model_loaded = False
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         else:
             # Fallback to custom trained best.pt in project root models/yolo/best.pt
             backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             project_dir = os.path.dirname(backend_dir)
             trained_candidates = [
-<<<<<<< HEAD
                 os.path.join(project_dir, "models", "yolo", "best.onnx"),
                 os.path.join(project_dir, "models", "yolo", "best_fp16.pt"),
                 os.path.join(project_dir, "models", "yolo", "best.pt"),
                 os.path.join(backend_dir, "models", "yolo", "best.pt"),
                 os.path.join(backend_dir, "models", "checkpoints", "sih57_yolo_run", "weights", "best.pt"),
                 os.path.join(backend_dir, "models", "checkpoints", "yolo", "best.pt"),
-=======
-                os.path.join(project_dir, "models", "yolo", "best.pt"),
-                os.path.join(backend_dir, "models", "yolo", "best.pt"),
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
                 os.path.join(backend_dir, "yolo11n.pt")
             ]
             loaded = False
@@ -111,12 +98,8 @@ class YOLODetector:
                         self.model = YOLO(cand)
                         self.is_model_loaded = True
                         if hasattr(self.model, "names") and self.model.names:
-<<<<<<< HEAD
                             if len(self.model.names) <= 15:
                                 self.classes = {int(k): v for k, v in self.model.names.items()}
-=======
-                            self.classes = {int(k): v for k, v in self.model.names.items()}
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
                         loaded = True
                         break
                     except Exception as e:
@@ -180,7 +163,6 @@ class YOLODetector:
             for box in boxes:
                 xyxy = box.xyxy[0].cpu().numpy()
                 conf_val = float(box.conf[0].cpu().numpy())
-<<<<<<< HEAD
                 cls_idx = int(box.cls[0].cpu().numpy()) if box.cls is not None else 0
                 raw_cls_name = "marine_debris"
                 if hasattr(self.model, "names") and cls_idx in self.model.names:
@@ -198,10 +180,6 @@ class YOLODetector:
                         "bottle": "marine_debris", "cup": "marine_debris", "suitcase": "marine_debris"
                     }
                     cls_name = COCO_MAP.get(raw_cls_name, self.classes.get(cls_idx, "marine_debris"))
-=======
-                cls_idx = int(box.cls[0].cpu().numpy())
-                cls_name = self.classes.get(cls_idx, "marine_debris")
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
                 x1 = round(float(xyxy[0]), 1)
                 y1 = round(float(xyxy[1]), 1)

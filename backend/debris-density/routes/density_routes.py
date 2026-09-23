@@ -2,11 +2,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any
-<<<<<<< HEAD
 from backend.debris_density.services.density_service import DebrisDensityService
-=======
-from backend.debris-density.services.density_service import DebrisDensityService
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 router = APIRouter(prefix="/debris-density", tags=["Debris Density"])
 

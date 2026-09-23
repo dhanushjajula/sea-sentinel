@@ -1,12 +1,8 @@
 /**
  * Sea Sentinel: Interactive Sonar Waterfall Viewer
  * Renders acoustic waterfall scans with Port/Starboard channels, nadir line, and target bounding overlays.
-<<<<<<< HEAD
  * Supports multi-mode inspection, independent layer toggles (YOLO, U-Net, Fusion, Verification, IDs),
  * and interactive Zoom In / Zoom Out / Pan / Reset Zoom controls.
-=======
- * Supports multi-mode inspection and independent layer toggles (YOLO, U-Net, Fusion, Verification, IDs).
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
  */
 
 class WaterfallViewer {
@@ -17,7 +13,6 @@ class WaterfallViewer {
     this.selectedTargetId = null;
     this.currentMode = "overlay"; // "raw" | "enhanced" | "overlay"
 
-<<<<<<< HEAD
     // Zoom & Pan state
     this.scale = 1.0;
     this.panX = 0;
@@ -31,8 +26,6 @@ class WaterfallViewer {
     this.dragStartPanY = 0;
     this.hasMoved = false;
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     // Independent layer visibility toggles
     this.layers = {
       yolo: true,
@@ -42,30 +35,21 @@ class WaterfallViewer {
       ids: true
     };
 
-<<<<<<< HEAD
     // Dynamic confidence and sensitivity thresholds
     this.yoloConfThreshold = 0.45;
     this.unetSensThreshold = 0.50;
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     this.rawImage = null;
     this.enhancedImage = null;
     this.annotatedImage = null;
 
     // Default acoustic waterfall canvas size
     this.canvas.width = 1200;
-<<<<<<< HEAD
     this.canvas.height = 420;
-=======
-    this.canvas.height = 400;
-
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     this._generateSyntheticWaterfall();
     this._initEvents();
   }
 
-<<<<<<< HEAD
   zoomIn(factor = 1.25) {
     const cx = this.canvas.width / 2;
     const cy = this.canvas.height / 2;
@@ -151,8 +135,6 @@ class WaterfallViewer {
     this.render();
   }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   _generateSyntheticWaterfall() {
     const w = this.canvas.width;
     const h = this.canvas.height;
@@ -187,14 +169,6 @@ class WaterfallViewer {
     this.ctx.putImageData(imgData, 0, 0);
   }
 
-<<<<<<< HEAD
-=======
-  setTargets(targets) {
-    this.targets = targets || [];
-    this.render();
-  }
-
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   selectTarget(targetId) {
     this.selectedTargetId = targetId;
     this.render();
@@ -216,7 +190,6 @@ class WaterfallViewer {
     }
   }
 
-<<<<<<< HEAD
   setThresholds({ yoloConf, unetSens } = {}) {
     if (yoloConf !== undefined) this.yoloConfThreshold = Number(yoloConf);
     if (unetSens !== undefined) this.unetSensThreshold = Number(unetSens);
@@ -238,13 +211,10 @@ class WaterfallViewer {
     return passesYolo || passesUnet;
   }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   _isImageValid(img) {
     return Boolean(img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0);
   }
 
-<<<<<<< HEAD
   _loadImage(url, callback) {
     if (!url) {
       callback(null);
@@ -285,59 +255,6 @@ class WaterfallViewer {
       this.annotatedImage = img;
       this.render();
     });
-=======
-  loadSonarImages({ rawUrl, enhancedUrl, annotatedUrl }) {
-    if (rawUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        this.rawImage = img;
-        this.render();
-      };
-      img.onerror = () => {
-        console.warn("Raw sonar image could not be decoded by browser:", rawUrl);
-        this.rawImage = null;
-        this.render();
-      };
-      img.src = rawUrl;
-    } else {
-      this.rawImage = null;
-    }
-
-    if (enhancedUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        this.enhancedImage = img;
-        this.render();
-      };
-      img.onerror = () => {
-        console.warn("Enhanced sonar image could not be decoded:", enhancedUrl);
-        this.enhancedImage = null;
-        this.render();
-      };
-      img.src = enhancedUrl;
-    } else {
-      this.enhancedImage = null;
-    }
-
-    if (annotatedUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        this.annotatedImage = img;
-        this.render();
-      };
-      img.onerror = () => {
-        console.warn("Annotated sonar image could not be decoded:", annotatedUrl);
-        this.annotatedImage = null;
-        this.render();
-      };
-      img.src = annotatedUrl;
-    } else {
-      this.annotatedImage = null;
-    }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   clearImages() {
@@ -414,10 +331,6 @@ class WaterfallViewer {
   }
 
   _getTargetCanvasCoords(t, w, h) {
-<<<<<<< HEAD
-=======
-    // 1. Primary: Use verified normalized bounding box
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     const norm = t.norm_bbox;
     if (norm && (norm.x2 > norm.x1)) {
       const x1 = Math.max(0, norm.x1 * w);
@@ -427,10 +340,6 @@ class WaterfallViewer {
       return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
     }
 
-<<<<<<< HEAD
-=======
-    // 2. Secondary: If normalized polygon exists, derive bounding box from polygon extents
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
       let minX = 1.0, minY = 1.0, maxX = 0.0, maxY = 0.0;
       t.norm_polygon.forEach(pt => {
@@ -449,7 +358,6 @@ class WaterfallViewer {
         return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1) };
       }
     }
-<<<<<<< HEAD
     let b = t.pixel_bbox || t.bbox || {};
     let bx1 = 0, by1 = 0, bx2 = 80, by2 = 60;
     if (Array.isArray(b)) {
@@ -466,14 +374,10 @@ class WaterfallViewer {
       by2 = b.y2 != null ? b.y2 : (by1 + (b.height || b.h || (b.y2 ? b.y2 - by1 : 60)));
     }
 
-=======
-    const bbox = t.pixel_bbox || t.bbox || {};
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
     const imgH = (t.image_dimensions && t.image_dimensions.height) || (this.rawImage ? this.rawImage.naturalHeight : h) || h;
     const sx = w / imgW;
     const sy = h / imgH;
-<<<<<<< HEAD
     const x1 = bx1 * sx;
     const y1 = by1 * sy;
     const x2 = bx2 * sx;
@@ -545,41 +449,6 @@ class WaterfallViewer {
       pts.push({ x: px, y: py });
     }
     return pts;
-=======
-    const x1 = (bbox.x1 || 0) * sx;
-    const y1 = (bbox.y1 || 0) * sy;
-    const x2 = (bbox.x2 || (bbox.x1 + 80)) * sx;
-    const y2 = (bbox.y2 || (bbox.y1 + 60)) * sy;
-    return { x1, y1, x2, y2, bw: Math.max(12, x2 - x1), bh: Math.max(12, y2 - y1), sx, sy };
-  }
-
-  _getPolygonCanvasCoords(t, w, h) {
-    const imgW = (t.image_dimensions && t.image_dimensions.width) || (this.rawImage ? this.rawImage.naturalWidth : w) || w;
-    const imgH = (t.image_dimensions && t.image_dimensions.height) || (this.rawImage ? this.rawImage.naturalHeight : h) || h;
-    const sx = w / imgW;
-    const sy = h / imgH;
-
-    if (t.norm_polygon && Array.isArray(t.norm_polygon) && t.norm_polygon.length >= 3) {
-      return t.norm_polygon.map(pt => ({ x: pt[0] * w, y: pt[1] * h }));
-    }
-
-    if (t.polygon && Array.isArray(t.polygon) && t.polygon.length >= 3) {
-      return t.polygon.map(pt => ({ x: pt[0] * sx, y: pt[1] * sy }));
-    }
-
-    // Heuristic organic segmentation polygon inside bbox if polygon vertices not supplied
-    const coords = this._getTargetCanvasCoords(t, w, h);
-    const { x1, y1, bw, bh } = coords;
-    return [
-      { x: x1 + bw * 0.15, y: y1 + bh * 0.20 },
-      { x: x1 + bw * 0.50, y: y1 + bh * 0.08 },
-      { x: x1 + bw * 0.85, y: y1 + bh * 0.22 },
-      { x: x1 + bw * 0.95, y: y1 + bh * 0.60 },
-      { x: x1 + bw * 0.80, y: y1 + bh * 0.90 },
-      { x: x1 + bw * 0.45, y: y1 + bh * 0.95 },
-      { x: x1 + bw * 0.10, y: y1 + bh * 0.75 }
-    ];
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   render() {
@@ -587,7 +456,6 @@ class WaterfallViewer {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-<<<<<<< HEAD
     // Clear whole canvas before drawing with zoom / pan transform
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -609,12 +477,6 @@ class WaterfallViewer {
     } else {
       baseImg = this._isImageValid(this.enhancedImage) ? this.enhancedImage : (this._isImageValid(this.rawImage) ? this.rawImage : (this._isImageValid(this.annotatedImage) ? this.annotatedImage : null));
     }
-=======
-    // 1. Draw Base Background (Raw or Enhanced)
-    let baseImg = (this.currentMode === "raw" && this._isImageValid(this.rawImage)) ? this.rawImage :
-                  (this._isImageValid(this.enhancedImage) ? this.enhancedImage :
-                  (this._isImageValid(this.rawImage) ? this.rawImage : null));
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     if (baseImg && this._isImageValid(baseImg)) {
       try {
@@ -631,7 +493,6 @@ class WaterfallViewer {
 
     // In raw mode without overlays, don't draw bounding layers
     if (this.currentMode === "raw") {
-<<<<<<< HEAD
       ctx.restore();
       return;
     }
@@ -641,28 +502,16 @@ class WaterfallViewer {
 
     // 2. Render U-Net / Fusion Pixel-Level Segmentation & Node Dots
     activeTargets.forEach(t => {
-=======
-      return;
-    }
-
-    // 2. Render U-Net / Fusion Pixel-Level Segmentation & Node Dots
-    this.targets.forEach(t => {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       const isSelected = (t.object_id === this.selectedTargetId);
       const poly = this._getPolygonCanvasCoords(t, w, h);
       if (!poly || poly.length < 3) return;
 
-<<<<<<< HEAD
       const srcCategory = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
       const hasUnet = t.sources ? t.sources.includes("unet") : (srcCategory !== "YOLO_ONLY");
       const isFused = (srcCategory === "BOTH") || (t.sources && t.sources.includes("yolo") && t.sources.includes("unet"));
 
       // Render U-Net Segmentation Mask whenever unet layer is active OR fusion layer is active
       if ((this.layers.unet && hasUnet) || (this.layers.fusion && isFused)) {
-=======
-      // (A) Fused Boundaries Translucent Fill Mask
-      if (this.layers.fusion) {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(poly[0].x, poly[0].y);
@@ -670,7 +519,6 @@ class WaterfallViewer {
           ctx.lineTo(poly[i].x, poly[i].y);
         }
         ctx.closePath();
-<<<<<<< HEAD
 
         // 1. Solid Luminous Acoustic Mask Fill (Strictly visible)
         ctx.fillStyle = isSelected 
@@ -717,60 +565,15 @@ class WaterfallViewer {
           ctx.fillText(uBadgeText, uBadgeX + 4, uBadgeY - 1);
         }
 
-=======
-        ctx.fillStyle = isSelected ? "rgba(0, 255, 128, 0.32)" : "rgba(0, 240, 255, 0.20)";
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // (B) U-Net Crisp Perimeter Contour Lines & Keypoint Node Dots
-      if (this.layers.unet) {
-        ctx.save();
-        const colors = ["#00f0ff", "#d946ef", "#00e676", "#ff9800", "#38bdf8"];
-        for (let i = 0; i < poly.length; i++) {
-          const p1 = poly[i];
-          const p2 = poly[(i + 1) % poly.length];
-          const segColor = colors[i % colors.length];
-
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.lineWidth = isSelected ? 3.2 : 2.4;
-          ctx.strokeStyle = segColor;
-          ctx.shadowColor = segColor;
-          ctx.shadowBlur = 6;
-          ctx.stroke();
-        }
-
-        // Draw U-Net Keypoint / Vertex Node Dots
-        const nodeColors = ["#00e676", "#00f0ff", "#e040fb", "#ff9800", "#38bdf8"];
-        for (let i = 0; i < poly.length; i++) {
-          const pt = poly[i];
-          const nCol = nodeColors[i % nodeColors.length];
-
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, isSelected ? 5.2 : 4.2, 0, Math.PI * 2);
-          ctx.fillStyle = nCol;
-          ctx.fill();
-          ctx.lineWidth = 1.5;
-          ctx.strokeStyle = "#ffffff";
-          ctx.stroke();
-        }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         ctx.restore();
       }
     });
 
-<<<<<<< HEAD
     // Store interactive hit areas for precise canvas click / hover interaction
     this._targetHitBoxes = [];
 
     // 3. Render YOLO Bold Green Bounding Boxes
     activeTargets.forEach(t => {
-=======
-    // 3. Render YOLO Bold Green Bounding Boxes & Magenta Label Tags
-    this.targets.forEach(t => {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       const coords = this._getTargetCanvasCoords(t, w, h);
       const { x1, y1, bw, bh } = coords;
 
@@ -778,27 +581,16 @@ class WaterfallViewer {
       const srcCategory = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
       const hasYolo = t.sources ? t.sources.includes("yolo") : (srcCategory !== "UNET_ONLY");
 
-<<<<<<< HEAD
       // Draw YOLO Bold Green Bounding Box strictly when yolo layer is active AND target has yolo provenance
       if (this.layers.yolo && hasYolo) {
         ctx.save();
         ctx.lineWidth = isSelected ? 3.5 : 2.6;
-=======
-      // Draw YOLO Bold Green Bounding Box
-      if (this.layers.yolo && (hasYolo || this.layers.fusion || this.layers.unet)) {
-        ctx.save();
-        ctx.lineWidth = isSelected ? 3.5 : 2.8;
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         ctx.strokeStyle = "#00e676"; // Bright Neon Green
         ctx.shadowColor = "#00e676";
         ctx.shadowBlur = isSelected ? 16 : 8;
         ctx.strokeRect(x1, y1, bw, bh);
 
-<<<<<<< HEAD
         // Corner brackets (Strict 90-degree corner brackets, no diagonal lines)
-=======
-        // Corner brackets
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         const cLen = Math.min(12, bw * 0.22, bh * 0.22);
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -807,7 +599,6 @@ class WaterfallViewer {
         ctx.moveTo(x1, y1 + bh - cLen); ctx.lineTo(x1, y1 + bh); ctx.lineTo(x1 + cLen, y1 + bh);
         ctx.moveTo(x1 + bw - cLen, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh); ctx.lineTo(x1 + bw, y1 + bh - cLen);
         ctx.stroke();
-<<<<<<< HEAD
         ctx.restore();
       }
     });
@@ -1126,105 +917,11 @@ class WaterfallViewer {
       if (this.hasMoved) return;
       const pt = getCanvasPoint(e);
       const clicked = findHitTarget(pt);
-=======
-
-        // (B) Magenta Label Pill Badge (matching reference image "Normal" / Class tag)
-        const confPct = Math.round((t.calibrated_confidence || t.confidence || 0) * 100);
-        const cleanClass = (t.class || "debris").replace(/_/g, " ").toUpperCase();
-        const provBadge = srcCategory === "BOTH" ? " [YOLO+U-NET]" : (srcCategory === "UNET_ONLY" ? " [U-NET]" : " [YOLO]");
-        const badgeText = `${cleanClass} ${confPct}%${provBadge}`;
-
-        ctx.font = "bold 11px 'JetBrains Mono', monospace";
-        const tagW = ctx.measureText(badgeText).width + 16;
-        const tagH = 22;
-        const tagY = Math.max(0, y1 - tagH + 2);
-
-        // Solid Magenta fill
-        ctx.fillStyle = "#e00080";
-        ctx.fillRect(x1, tagY, tagW, tagH);
-
-        // Crisp white border
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x1, tagY, tagW, tagH);
-
-        // Clean white text
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(badgeText, x1 + 8, tagY + 15);
-
-        ctx.restore();
-      }
-
-      // Draw Verification Indicator Badge
-      if (this.layers.verify) {
-        ctx.save();
-        const vStatus = t.verification_status || "confirmed";
-        const isConfirmed = (vStatus === "confirmed");
-        const badgeColor = isConfirmed ? "#00e676" : "#ffab00";
-        const badgeText = isConfirmed ? "VERIFIED" : "SUSPICIOUS";
-
-        ctx.font = "bold 9px 'JetBrains Mono', monospace";
-        const bWidth = ctx.measureText(badgeText).width + 8;
-        ctx.fillStyle = "rgba(10, 15, 26, 0.92)";
-        ctx.fillRect(x1 + bw - bWidth - 2, y1 + bh - 16, bWidth, 14);
-        ctx.strokeStyle = badgeColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x1 + bw - bWidth - 2, y1 + bh - 16, bWidth, 14);
-        ctx.fillStyle = badgeColor;
-        ctx.fillText(badgeText, x1 + bw - bWidth + 2, y1 + bh - 6);
-        ctx.restore();
-      }
-
-      // Draw Target IDs and Priority / Risk Level
-      if (this.layers.ids) {
-        ctx.save();
-        const prioScore = t.priority_score || 85;
-        const prioLevel = t.priority_level || (t.risk_score || "HIGH");
-        const label = `${t.object_id} — ${prioScore} — ${prioLevel}`;
-
-        ctx.font = "bold 10px 'JetBrains Mono', monospace";
-        const textW = ctx.measureText(label).width;
-        const idY = y1 + bh + 14;
-
-        if (idY < h) {
-          const badgeCol = (prioScore >= 81) ? "#ff3366" : ((prioScore >= 61) ? "#ff9100" : "#00f0ff");
-          ctx.fillStyle = "rgba(4, 10, 24, 0.94)";
-          ctx.fillRect(x1, y1 + bh + 2, textW + 10, 16);
-          ctx.strokeStyle = badgeCol;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x1, y1 + bh + 2, textW + 10, 16);
-          ctx.fillStyle = badgeCol;
-          ctx.fillText(label, x1 + 5, y1 + bh + 14);
-        }
-        ctx.restore();
-      }
-    });
-  }
-
-  _initEvents() {
-    const findHitTarget = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const scaleX = this.canvas.width / rect.width;
-      const scaleY = this.canvas.height / rect.height;
-      const clickX = (e.clientX - rect.left) * scaleX;
-      const clickY = (e.clientY - rect.top) * scaleY;
-
-      return this.targets.find(t => {
-        const coords = this._getTargetCanvasCoords(t, this.canvas.width, this.canvas.height);
-        return clickX >= coords.x1 && clickX <= coords.x2 && clickY >= coords.y1 && clickY <= coords.y2;
-      });
-    };
-
-    // Click selection
-    this.canvas.addEventListener('click', (e) => {
-      const clicked = findHitTarget(e);
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       if (clicked && window.app) {
         window.app.onTargetSelected(clicked.object_id, { fly: true, force: true });
       }
     });
 
-<<<<<<< HEAD
     // Double click to zoom in or reset
     this.canvas.addEventListener('dblclick', (e) => {
       e.preventDefault();
@@ -1233,18 +930,6 @@ class WaterfallViewer {
       } else {
         const pt = getCanvasPoint(e);
         this.zoomAt(pt.rawX, pt.rawY, 1.8);
-=======
-    // Hover detection
-    this.canvas.addEventListener('mousemove', (e) => {
-      const hit = findHitTarget(e);
-      if (hit) {
-        this.canvas.style.cursor = 'pointer';
-        if (window.app && window.app.selectedTargetId !== hit.object_id) {
-          window.app.onTargetSelected(hit.object_id, { fly: false });
-        }
-      } else {
-        this.canvas.style.cursor = 'default';
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       }
     });
   }

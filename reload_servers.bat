@@ -11,7 +11,6 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING
     taskkill /F /PID %%a 2>nul
 )
 
-<<<<<<< HEAD
 set PYTHON_EXE=python
 if exist "%~dp0.venv\Scripts\python.exe" (
     set PYTHON_EXE=%~dp0.venv\Scripts\python.exe
@@ -28,13 +27,6 @@ if %ERRORLEVEL% equ 0 (
     echo [2/3] Python not found on system PATH. Starting PowerShell Frontend Server...
     start "Sea Sentinel Frontend" powershell -ExecutionPolicy Bypass -NoExit -File "%~dp0serve.ps1"
 )
-=======
-echo [2/3] Starting FastAPI Backend Server on http://localhost:8000 ...
-start "Sea Sentinel Backend" /D "%~dp0backend" python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-echo [3/3] Starting Frontend Web Server on http://localhost:3000 ...
-start "Sea Sentinel Frontend" /D "%~dp0" python -m http.server 3000 --directory frontend
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 echo.
 echo Servers successfully reloaded!

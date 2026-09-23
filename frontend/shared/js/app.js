@@ -18,17 +18,13 @@ class DashboardApp {
     this.isRejected = false;
     this.currentSort = 'priority';
     this.currentPipelineMode = 'balanced';
-<<<<<<< HEAD
     this.apiService = window.apiService || (typeof SeaSentinelAPI !== 'undefined' ? new SeaSentinelAPI() : null);
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     this._init();
   }
 
   async _init() {
     // 0. Initialize Splash Screen Intro
-<<<<<<< HEAD
     try {
       this._initSplashScreen();
     } catch (e) {
@@ -87,37 +83,13 @@ class DashboardApp {
     this.renderTargetList();
     this._clearInspector();
     this.resetStepper();
-=======
-    this._initSplashScreen();
-
-    // 1. Initialize Visual Engines
-    this.waterfall = new WaterfallViewer('sonarCanvas');
-    this.map = new GISMap('leafletMap');
-
-    // 2. Setup Event Handlers
-    this._setupEventListeners();
-
-    // 3. Check Backend Health & Model Status
-    await this.checkBackendStatus();
-
-    // 4. Load Sample Catalog
-    await this.loadSampleCatalog();
-
-    // 5. Automatically select and run the first sample
-    if (this.samples && this.samples.length > 0) {
-      await this.selectSampleMission(this.samples[0].id, { autoRun: true });
-    }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   _initSplashScreen() {
     const splash = document.getElementById('appSplashScreen');
     const progressBar = document.getElementById('splashLoadingProgress');
     const statusText = document.getElementById('splashLoadingText');
-<<<<<<< HEAD
     const portalScreen = document.getElementById('portalSelectionScreen');
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     if (!splash) return;
 
@@ -128,15 +100,11 @@ class DashboardApp {
       splash.classList.add('fade-out');
       setTimeout(() => {
         splash.style.display = 'none';
-<<<<<<< HEAD
         // Show Portal Gateway Selection screen right after logo intro
         if (portalScreen) {
           portalScreen.style.display = 'flex';
         }
       }, 700);
-=======
-      }, 850);
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     };
 
     splash.addEventListener('click', dismissSplash);
@@ -150,11 +118,7 @@ class DashboardApp {
       { progress: 25, text: 'INITIALIZING PARALLEL YOLO + U-NET PIPELINES...', delay: 200 },
       { progress: 55, text: 'CALIBRATING MULTI-SIGNAL FUSION ENGINE...', delay: 650 },
       { progress: 85, text: 'CALIBRATING GEOMATICS & HIGH-RECALL VERIFIER...', delay: 1100 },
-<<<<<<< HEAD
       { progress: 100, text: 'DUAL-PATH SYSTEMS ONLINE · SELECT OPERATIONAL PORTAL...', delay: 1500 },
-=======
-      { progress: 100, text: 'DUAL-PATH SYSTEMS ONLINE · ENTERING DASHBOARD...', delay: 1600 },
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     ];
 
     steps.forEach(({ progress, text, delay }) => {
@@ -168,7 +132,6 @@ class DashboardApp {
 
     setTimeout(() => {
       dismissSplash();
-<<<<<<< HEAD
     }, 1900);
   }
 
@@ -206,24 +169,18 @@ class DashboardApp {
         this.currentSample = this.samples[0];
       }
     }
-=======
-    }, 2100);
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   async checkBackendStatus() {
     const health = await window.apiService.checkHealth();
     this.isBackendOnline = (health.status === "healthy");
 
-<<<<<<< HEAD
     this.updateBackendConnectionUI({
       status: this.isBackendOnline ? "healthy" : "offline",
       baseUrl: window.apiService.baseUrl,
       latencyMs: window.apiService.lastLatencyMs
     });
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     const statusPill = document.getElementById('pipelineStatusPill');
     const statusText = document.getElementById('pipelineStatusText');
     if (statusPill && statusText) {
@@ -232,11 +189,7 @@ class DashboardApp {
         statusText.textContent = "PIPELINE READY";
       } else {
         statusPill.className = "status-pill processing";
-<<<<<<< HEAD
         statusText.textContent = "EDGE AI READY";
-=======
-        statusText.textContent = "BACKEND OFFLINE";
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       }
     }
 
@@ -260,7 +213,6 @@ class DashboardApp {
     }
   }
 
-<<<<<<< HEAD
   updateBackendConnectionUI(info) {
     const badge = document.getElementById('backendConnectionBadge');
     if (!badge) return;
@@ -354,8 +306,6 @@ class DashboardApp {
     }
   }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   async loadSampleCatalog() {
     this.samples = await window.apiService.fetchSamples();
     if (this.samples && this.samples.length > 0) {
@@ -365,15 +315,9 @@ class DashboardApp {
     if (!container) return;
 
     container.innerHTML = '';
-<<<<<<< HEAD
     this.samples.forEach((s) => {
       const btn = document.createElement('button');
       btn.className = 'sample-pill';
-=======
-    this.samples.forEach((s, idx) => {
-      const btn = document.createElement('button');
-      btn.className = `sample-pill ${idx === 0 ? 'active' : ''}`;
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       btn.dataset.sampleId = s.id;
 
       let icon = "fa-network-wired";
@@ -395,11 +339,7 @@ class DashboardApp {
       btn.title = s.description || s.name;
       btn.onclick = (e) => {
         e.stopPropagation();
-<<<<<<< HEAD
         this.selectSampleMission(s.id, { autoRun: true });
-=======
-        this.selectSampleMission(s.id);
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       };
       container.appendChild(btn);
     });
@@ -435,7 +375,6 @@ class DashboardApp {
     this.renderTargetList();
     this._clearInspector();
 
-<<<<<<< HEAD
     if (this.currentSample) {
       let rawUrl = this.currentSample.raw_url || this.currentSample.path;
       if (!rawUrl && this.currentSample.filename) {
@@ -450,14 +389,6 @@ class DashboardApp {
     }
 
     if (options.autoRun === true) {
-=======
-    if (this.currentSample && this.currentSample.path) {
-      const imgUrl = `${window.apiService.baseUrl}/api/image?path=${encodeURIComponent(this.currentSample.path)}`;
-      this.waterfall.loadSonarImages({ rawUrl: imgUrl });
-    }
-
-    if (options.autoRun !== false) {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       await this.executeAIPipeline();
     }
   }
@@ -575,7 +506,6 @@ class DashboardApp {
     });
   }
 
-<<<<<<< HEAD
   async handleFileSelect(e) {
     const files = e && e.target && e.target.files ? e.target.files : (e && e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : null);
     if (files && files.length > 0) {
@@ -587,8 +517,6 @@ class DashboardApp {
     }
   }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   async executeAIPipeline() {
     const statusPill = document.getElementById('pipelineStatusPill');
     const statusText = document.getElementById('pipelineStatusText');
@@ -597,12 +525,9 @@ class DashboardApp {
       statusText.textContent = "PARALLEL INFERENCE & FUSION...";
     }
 
-<<<<<<< HEAD
     const cardWaterfall = document.getElementById('cardWaterfall');
     if (cardWaterfall) cardWaterfall.style.display = 'block';
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     const stepNodes = [
       "stepUpload", "stepPrep", "stepYolo", "stepUnet", "stepAuto", "stepGeo", "stepReport"
     ];
@@ -627,7 +552,6 @@ class DashboardApp {
       let analysisResult = null;
       let imagePathToAnalyze = null;
 
-<<<<<<< HEAD
       const api = this.apiService || window.apiService || (typeof SeaSentinelAPI !== 'undefined' ? (window.apiService = new SeaSentinelAPI()) : null);
       if (!api) {
         throw new Error("API service is initializing. Please verify backend connection and try again.");
@@ -642,14 +566,6 @@ class DashboardApp {
         }
       } else if (this.currentSample && (this.currentSample.path || this.currentSample.filename)) {
         imagePathToAnalyze = this.currentSample.path || (this.currentSample.filename ? `assets/samples/${this.currentSample.filename}` : null);
-=======
-      if (this.uploadedFile) {
-        if (statusText) statusText.textContent = "UPLOADING SONAR RASTER...";
-        const uploadRes = await window.apiService.uploadFile(this.uploadedFile);
-        imagePathToAnalyze = uploadRes.saved_path;
-      } else if (this.currentSample && this.currentSample.path) {
-        imagePathToAnalyze = this.currentSample.path;
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       }
 
       if (!imagePathToAnalyze) {
@@ -657,11 +573,7 @@ class DashboardApp {
       }
 
       if (statusText) statusText.textContent = `RUNNING DUAL-PATH AI (${this.currentPipelineMode.toUpperCase()})...`;
-<<<<<<< HEAD
       analysisResult = await api.analyzeImage(imagePathToAnalyze, null, null, 1, this.currentPipelineMode, this.uploadedFile);
-=======
-      analysisResult = await window.apiService.analyzeImage(imagePathToAnalyze, null, null, 1, this.currentPipelineMode);
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
       clearInterval(stepInterval);
 
@@ -670,11 +582,7 @@ class DashboardApp {
         if (el) el.className = "stepper-node active";
       });
 
-<<<<<<< HEAD
       if (analysisResult && (analysisResult.status === "success" || analysisResult.analysis_id || (!analysisResult.error && !analysisResult.detail))) {
-=======
-      if (analysisResult && analysisResult.status === "success") {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         try {
           this.applyAnalysisResult(analysisResult);
         } catch (renderErr) {
@@ -682,7 +590,6 @@ class DashboardApp {
         }
         if (statusPill && statusText) {
           statusPill.className = "status-pill complete";
-<<<<<<< HEAD
           statusText.textContent = analysisResult.is_edge_fallback ? "PIPELINE COMPLETE (EDGE AI)" : "PIPELINE COMPLETE";
         }
         if (analysisResult.is_edge_fallback) {
@@ -694,12 +601,6 @@ class DashboardApp {
         }
       } else {
         throw new Error((analysisResult && (analysisResult.detail || analysisResult.error)) || "Analysis did not return successful status.");
-=======
-          statusText.textContent = "PIPELINE COMPLETE";
-        }
-      } else {
-        throw new Error((analysisResult && analysisResult.detail) || "Analysis did not return successful status.");
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       }
 
     } catch (err) {
@@ -717,7 +618,6 @@ class DashboardApp {
       if (isNonSonar) {
         this.handlePipelineRejection(err.detail || err.message);
       } else {
-<<<<<<< HEAD
         // If an unexpected network or fetch error slipped through, attempt emergency edge simulation
         if (this.uploadedFile && window.apiService && window.apiService._runEdgeSimulationInference) {
           try {
@@ -739,8 +639,6 @@ class DashboardApp {
           }
         }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         if (statusPill && statusText) {
           statusPill.className = "status-pill error";
           statusText.textContent = "PIPELINE ERROR";
@@ -757,7 +655,6 @@ class DashboardApp {
   applyAnalysisResult(result) {
     this.isRejected = false;
     this.currentAnalysisResult = result;
-<<<<<<< HEAD
     this.allOriginalTargets = Array.isArray(result.detections) ? [...result.detections] : [];
     this.targets = [...this.allOriginalTargets];
 
@@ -771,10 +668,6 @@ class DashboardApp {
       this.waterfall.setThresholds({ yoloConf: yoloMin, unetSens: unetSens });
       this.waterfall.setTargets(this.targets);
     }
-=======
-    this.targets = result.detections || [];
-    this.waterfall.setTargets(this.targets);
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     const surveyMeta = {
       heading: (result.nav_log && result.nav_log.heading) || 85.0,
@@ -786,7 +679,6 @@ class DashboardApp {
     };
     this.map.setTargets(this.targets, surveyMeta);
 
-<<<<<<< HEAD
     this.filterActiveTargets(yoloMin, unetSens);
 
     const baseUrl = (window.apiService && window.apiService.baseUrl) || (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:8000');
@@ -812,16 +704,6 @@ class DashboardApp {
     this.waterfall.loadSonarImages({ rawUrl, enhancedUrl, annotatedUrl });
     this.waterfall.setViewMode("overlay");
     document.querySelectorAll('#viewModeContainer button, .sonar-pill-btn[data-mode], .view-mode-btn').forEach(b => {
-=======
-    const baseUrl = window.apiService.baseUrl;
-    const rawUrl = result.raw_image_url ? `${baseUrl}${result.raw_image_url}` : null;
-    const enhancedUrl = result.enhanced_image_url ? `${baseUrl}${result.enhanced_image_url}` : null;
-    const annotatedUrl = result.annotated_image_url ? `${baseUrl}${result.annotated_image_url}` : null;
-
-    this.waterfall.loadSonarImages({ rawUrl, enhancedUrl, annotatedUrl });
-    this.waterfall.setViewMode("overlay");
-    document.querySelectorAll('.view-mode-btn').forEach(b => {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       b.classList.toggle('active', b.dataset.mode === 'overlay');
     });
 
@@ -913,7 +795,6 @@ class DashboardApp {
     } else {
       this._clearInspector();
     }
-<<<<<<< HEAD
 
     [100, 300, 600].forEach(delay => {
       setTimeout(() => {
@@ -1030,8 +911,6 @@ class DashboardApp {
     }
     this.updateKPIs();
     this.renderTargetList();
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   updateKPIs() {
@@ -1095,19 +974,12 @@ class DashboardApp {
     const elKpiLow = document.getElementById('kpiLowCount');
     if (elKpiLow) elKpiLow.textContent = lowCount;
 
-<<<<<<< HEAD
     // Highest Priority Debris Card & Header Preview
-=======
-    // Highest Priority Debris Card
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     const hpCard = document.getElementById('highestPriorityCard');
     const hpName = document.getElementById('hpDebrisName');
     const hpScore = document.getElementById('hpDebrisScore');
     const hpLevel = document.getElementById('hpDebrisLevel');
-<<<<<<< HEAD
     const hpPreview = document.getElementById('hpDebrisNamePreview');
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     if (!isRejected && this.targets.length > 0) {
       // Find highest priority target
@@ -1123,10 +995,7 @@ class DashboardApp {
           hpLevel.textContent = pLevel;
           hpLevel.className = `hp-badge ${pLevel.toLowerCase()}`;
         }
-<<<<<<< HEAD
         if (hpPreview) hpPreview.textContent = `#${highestTarget.object_id}`;
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         if (hpCard) {
           hpCard.onclick = () => {
             this.onTargetSelected(highestTarget.object_id, { fly: true, force: true });
@@ -1142,10 +1011,7 @@ class DashboardApp {
         hpLevel.textContent = "STANDBY";
         hpLevel.className = "hp-badge low";
       }
-<<<<<<< HEAD
       if (hpPreview) hpPreview.textContent = "STANDBY";
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     }
 
     const avgConfidence = (!isRejected && this.targets.length > 0)
@@ -1178,11 +1044,8 @@ class DashboardApp {
         }
       }
     }
-<<<<<<< HEAD
 
     this.updateRecentSurveyReportsTable();
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   renderTargetList() {
@@ -1208,21 +1071,12 @@ class DashboardApp {
 
     if (!this.targets || this.targets.length === 0) {
       if (countTag) countTag.textContent = "0 TARGETS";
-<<<<<<< HEAD
       if (filterHint) filterHint.textContent = "Standing By";
       container.innerHTML = `
         <div class="empty-target-state">
           <div class="empty-icon"><i class="fa-solid fa-water"></i></div>
           <div class="empty-title">Awaiting Sonar Input</div>
           <div class="empty-desc">Upload a side-scan sonar image (.png, .tif, .jpg) or select a survey sample mission to run dual-path inference.</div>
-=======
-      if (filterHint) filterHint.textContent = "Clear Sector";
-      container.innerHTML = `
-        <div class="empty-target-state">
-          <div class="empty-icon"><i class="fa-solid fa-water"></i></div>
-          <div class="empty-title">No Anomalies Detected</div>
-          <div class="empty-desc">Clear seabed sector. No debris targets or acoustic shadow anomalies identified in this survey tile.</div>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         </div>
       `;
       return;
@@ -1268,12 +1122,8 @@ class DashboardApp {
 
     sortedTargets.forEach((t, idx) => {
       const item = document.createElement('div');
-<<<<<<< HEAD
       const isSelected = (t.object_id === this.selectedTargetId);
       item.className = `target-card-item ${isSelected ? 'active' : ''}`;
-=======
-      item.className = `target-card ${t.object_id === this.selectedTargetId ? 'active' : ''}`;
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       
       item.onclick = () => this.onTargetSelected(t.object_id, { fly: true, force: true });
       item.onmouseenter = () => this.onTargetSelected(t.object_id, { fly: false });
@@ -1284,7 +1134,6 @@ class DashboardApp {
       const prioScore = t.priority_score != null ? Math.round(t.priority_score) : Math.round(conf * 0.95);
       const prioLevel = (t.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
       
-<<<<<<< HEAD
       const vStatus = t.verification_status || "confirmed";
       const isConfirmed = (vStatus === "confirmed" || vStatus === "confirmed_debris");
       const statusLabel = isConfirmed ? "Confirmed" : "Suspicious";
@@ -1313,91 +1162,6 @@ class DashboardApp {
         <div class="target-card-right">
           <span class="badge-pill ${statusClass}">● ${statusLabel}</span>
           <i class="fa-solid fa-chevron-right" style="color: var(--text-dim); font-size: 0.72rem;"></i>
-=======
-      const hazardScore = t.hazard_score != null ? Math.round(t.hazard_score) : (t.risk_score === 'HIGH' ? 82 : 45);
-      const hazardLevel = (t.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-      const risk = t.risk_score || (hazardScore >= 80 ? 'HIGH' : hazardScore >= 50 ? 'MED' : 'LOW');
-      const isHigher = prioScore >= 60;
-      const accVal = t.accuracy_score != null ? (t.accuracy_score * 100) : (conf * 0.98);
-      const accStr = accVal.toFixed(1);
-
-      const vStatus = t.verification_status || "confirmed";
-      const isConfirmed = (vStatus === "confirmed");
-      const statusLabel = isConfirmed ? "CONFIRMED DEBRIS" : "SUSPICIOUS ANOMALY";
-      const statusClass = isConfirmed ? "confirmed" : "suspicious";
-
-      const srcCat = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
-      const srcTagClass = srcCat === "BOTH" ? "both" : (srcCat === "UNET_ONLY" ? "unet" : "yolo");
-      const srcTagLabel = srcCat === "BOTH" ? "YOLO + U-NET" : srcCat.replace("_ONLY", " ONLY");
-
-      let lat = (t.latitude != null) ? Number(t.latitude) : (t.lat != null ? Number(t.lat) : null);
-      let lon = (t.longitude != null) ? Number(t.longitude) : (t.lon != null ? Number(t.lon) : null);
-      const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
-
-      const formatDeg = (num, isLat) => {
-        if (num == null || isNaN(num)) return "--";
-        const val = Math.abs(Number(num)).toFixed(5);
-        const dir = isLat ? (num >= 0 ? 'N' : 'S') : (num >= 0 ? 'E' : 'W');
-        return `${val}°${dir}`;
-      };
-
-      const geoLabel = hasCoords ? `<i class="fa-solid fa-location-dot"></i> ${formatDeg(lat, true)}, ${formatDeg(lon, false)}` : `<span style="color:#94a3b8; font-weight:600;"><i class="fa-solid fa-ban"></i> UNREFERENCED (Case C)</span>`;
-      const lenM = t.length_m ? Math.round(t.length_m) : 18;
-      const widM = t.width_m ? Math.round(t.width_m) : 6;
-      const areaM = t.area_sq_m ? Math.round(t.area_sq_m) : (lenM * widM);
-
-      // Category Icon mapping
-      const typeIcons = {
-        'engine_debris': 'fa-gears',
-        'pipeline_or_cable': 'fa-bezier-curve',
-        'shipwreck_fragment': 'fa-anchor',
-        'fishing_net': 'fa-network-wired',
-        'riprap_debris': 'fa-cubes-stacked'
-      };
-      const iconClass = typeIcons[t.class] || 'fa-crosshairs';
-      const formattedName = cleanClass.toUpperCase();
-
-      item.dataset.targetId = t.object_id;
-      item.innerHTML = `
-        <div class="target-card-top">
-          <div class="target-id-group">
-            <span class="target-index-pill">#${String(idx + 1).padStart(2, '0')}</span>
-            <span class="target-id target-id-pill">${t.object_id}</span>
-          </div>
-          <div class="target-header-badges">
-            <span class="provenance-tag ${srcTagClass}" title="${srcCat === 'BOTH' ? 'Dual-Model Consensus: Verified by YOLOv11 & Attention U-Net' : srcTagLabel}">[${srcTagLabel}]</span>
-            <span class="hazard-badge ${risk}">${risk}</span>
-          </div>
-        </div>
-
-        <div class="target-name-clean">
-          <i class="fa-solid ${iconClass} target-type-icon"></i>
-          <span class="target-name-text">${formattedName}</span>
-        </div>
-
-        <div class="target-metrics-grid">
-          <div class="metric-badge priority ${prioLevel.toLowerCase()}" title="Inspection Priority: ${prioScore}/100 (${prioLevel})">
-            <i class="fa-solid fa-bolt"></i>
-            <span class="badge-text">PRIORITY ${prioScore}/100</span>
-          </div>
-          <div class="metric-badge status ${statusClass}" title="Verification Status: ${statusLabel}">
-            <i class="fa-solid fa-circle-dot"></i>
-            <span class="badge-text">${statusLabel}</span>
-          </div>
-          <div class="metric-badge confidence" title="AI Detection Confidence: ${conf}%">
-            <i class="fa-solid fa-crosshairs"></i>
-            <span class="badge-text">CONFIDENCE ${conf}%</span>
-          </div>
-          <div class="metric-badge hazard" title="Acoustic Hazard Risk: ${hazardScore}/100 (${hazardLevel})">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span class="badge-text">HAZARD ${hazardScore}/100</span>
-          </div>
-        </div>
-
-        <div class="target-card-meta-clean">
-          <span class="meta-item"><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m (${areaM.toLocaleString()} m²)</span>
-          <span class="meta-item mono">${geoLabel}</span>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         </div>
       `;
 
@@ -1430,13 +1194,8 @@ class DashboardApp {
   onTargetSelected(targetId, options = {}) {
     this.selectedTargetId = targetId;
 
-<<<<<<< HEAD
     document.querySelectorAll('.target-card-item, .target-card').forEach(card => {
       const idEl = card.querySelector('.target-id, .target-id-title');
-=======
-    document.querySelectorAll('.target-card').forEach(card => {
-      const idEl = card.querySelector('.target-id');
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       const isMatch = (card.dataset.targetId === targetId || (idEl && idEl.textContent.trim() === targetId));
       card.classList.toggle('active', isMatch);
       if (isMatch && options.force) {
@@ -1453,14 +1212,6 @@ class DashboardApp {
     if (revBadge) {
       revBadge.textContent = targetId;
     }
-<<<<<<< HEAD
-=======
-    // Synchronize Target List active styling
-    document.querySelectorAll('.target-card').forEach(el => {
-      const idEl = el.querySelector('.target-id');
-      el.classList.toggle('active', el.dataset.targetId === targetId || (idEl && idEl.textContent.trim() === targetId));
-    });
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     this.waterfall.selectTarget(targetId);
     this.map.selectTarget(targetId, options);
@@ -1483,11 +1234,7 @@ class DashboardApp {
       const conf = Math.round((target.calibrated_confidence || target.confidence || 0.85) * 100);
 
       const specificNarrative = `Target #${target.object_id} is classified as '${cleanCls}' with ${conf}% AI confidence and inspection priority of ${pScore}/100 (${pLvl}). Estimated seabed footprint is ${area.toFixed(1)} m². Multi-path acoustics verify high structural backscatter contrast and shadow displacement confirming physical elevation above seabed.`;
-<<<<<<< HEAD
       narrativeEl.textContent = (target.score_explanation && target.score_explanation.narrative) || target.explanation || specificNarrative;
-=======
-      narrativeEl.textContent = (target.score_explanation && target.score_explanation.narrative) || specificNarrative;
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     }
 
     const statusTag = document.getElementById('explainabilityStatusTag');
@@ -1500,15 +1247,9 @@ class DashboardApp {
     const recEl = document.getElementById('targetActionRec');
     if (recEl) {
       const action = (target.score_explanation && target.score_explanation.action_recommendation) || target.action_recommendation || "Prioritize for ROV acoustic / optical inspection and tactical debris retrieval";
-<<<<<<< HEAD
       const prioLevelClass = (target.priority_level || 'HIGH').toLowerCase();
       recEl.innerHTML = `
         <div class="action-rec-badge ${prioLevelClass}">
-=======
-      const prioLevel = (target.priority_level || 'HIGH').toLowerCase();
-      recEl.innerHTML = `
-        <div class="action-rec-badge ${prioLevel}">
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           <i class="fa-solid fa-clipboard-check"></i> 
           <div><b>Protocol:</b> ${action}</div>
         </div>
@@ -1519,18 +1260,13 @@ class DashboardApp {
     if (physicsEl) {
       const srcCat = target.source_category || (target.sources && target.sources.length > 1 ? "BOTH" : (target.sources && target.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
       const prioScore = target.priority_score != null ? Math.round(target.priority_score) : 85;
-<<<<<<< HEAD
       const prioLevel = (target.priority_level || 'HIGH').toUpperCase();
-=======
-      const prioLevel = target.priority_level || 'HIGH';
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       const hazardScore = target.hazard_score != null ? Math.round(target.hazard_score) : 75;
       const confScore = Math.round((target.calibrated_confidence || target.confidence || 0.85) * 100);
       const accScore = (target.accuracy_score != null ? (target.accuracy_score * 100) : (confScore * 0.98)).toFixed(1);
 
       let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : null);
       let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : null);
-<<<<<<< HEAD
       const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0);
       const formatCoord = (val, isLat) => {
         if (val == null || isNaN(val)) return "--";
@@ -1541,10 +1277,6 @@ class DashboardApp {
       };
       const geoText = hasCoords ? `${formatCoord(lat, true)}, ${formatCoord(lon, false)}` : "Case C (Unreferenced)";
       const provText = srcCat === 'BOTH' ? 'PARALLEL DUAL-PATH [YOLO+U-NET]' : srcCat;
-=======
-      const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
-      const geoText = hasCoords ? `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E` : "Case C (Unref)";
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
       physicsEl.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.76rem;">
@@ -1558,11 +1290,7 @@ class DashboardApp {
         <div class="physics-grid">
           <div class="physics-cell">
             <span class="p-lbl">PROVENANCE:</span>
-<<<<<<< HEAD
             <span class="p-val ${srcCat === 'BOTH' ? 'cyan' : (srcCat === 'UNET_ONLY' ? 'magenta' : 'orange')}">${provText}</span>
-=======
-            <span class="p-val ${srcCat === 'BOTH' ? 'cyan' : (srcCat === 'UNET_ONLY' ? 'magenta' : 'orange')}">${srcCat}</span>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           </div>
           <div class="physics-cell">
             <span class="p-lbl">AI CONFIDENCE:</span>
@@ -1595,11 +1323,7 @@ class DashboardApp {
           <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.7rem;">
             <div style="display: flex; justify-content: space-between; color: #cbd5e1;">
               <span>1. Dual-Model Consensus (35%)</span>
-<<<<<<< HEAD
               <span style="color: #4ade80; font-family: var(--font-mono);">${srcCat === 'BOTH' ? '98.5% (Dual-Path)' : '82.0% (Single)'}</span>
-=======
-              <span style="color: #4ade80; font-family: var(--font-mono);">${srcCat === 'BOTH' ? '98.5% (Max)' : '82.0% (Single)'}</span>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             </div>
             <div style="display: flex; justify-content: space-between; color: #cbd5e1;">
               <span>2. Acoustic Shadow Contrast (25%)</span>
@@ -1621,7 +1345,6 @@ class DashboardApp {
         </div>
       `;
     }
-<<<<<<< HEAD
 
     // Render Dedicated IMO Hazard Assessment Sub-Panel
     this.renderImoRiskSection(target);
@@ -1866,8 +1589,6 @@ class DashboardApp {
         ` : ''}
       </div>
     `;
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   }
 
   navigateTargetStep(step) {
@@ -1882,302 +1603,6 @@ class DashboardApp {
     }
   }
 
-<<<<<<< HEAD
-=======
-  renderReportModal() {
-    const container = document.getElementById('modalReportContent');
-    if (!container) return;
-
-    if (!this.currentAnalysisResult) {
-      container.innerHTML = `
-        <div style="text-align:center; padding: 40px; color: #94a3b8;">
-          <i class="fa-solid fa-triangle-exclamation" style="font-size: 2.2rem; color: #f59e0b; margin-bottom: 12px;"></i>
-          <h3 style="color: #ffffff; margin-bottom: 8px;">No Active Survey Analysis</h3>
-          <p>Please upload or select a Side-Scan Sonar (SSS) survey image and execute the dual-path AI pipeline first.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const res = this.currentAnalysisResult;
-    const rep = res.report_summary || {};
-    const targets = this.targets || res.detections || [];
-    const durSec = res.total_duration_ms ? (res.total_duration_ms / 1000).toFixed(2) : "4.80";
-    const surveyId = res.analysis_id || "SURVEY_DEMO_01";
-    const timestamp = new Date(res.timestamp || Date.now()).toUTCString();
-    
-    // Overall Accuracy score
-    const avgConf = targets.length > 0
-      ? (targets.reduce((acc, t) => acc + (t.calibrated_confidence || t.confidence || 0.85), 0) / targets.length * 100)
-      : 85.0;
-    const accuracyScore = avgConf.toFixed(1);
-
-    // Image URLs
-    const samplePath = (this.currentSample && this.currentSample.path) ? this.currentSample.path : '';
-    const rawUrl = res.raw_image_url || (samplePath ? `${window.apiService.baseUrl}/api/image?path=${encodeURIComponent(samplePath)}` : 'assets/sea_sentinel_emblem.png');
-    const enhancedUrl = res.enhanced_image_url || rawUrl;
-    const annotUrl = res.annotated_image_url || rawUrl;
-
-    // Build Table Rows
-    const targetRowsHtml = targets.map((t, idx) => {
-      const conf = Math.round((t.calibrated_confidence || t.confidence || 0.85) * 100);
-      const acc = (t.accuracy_score != null ? (t.accuracy_score * 100) : (conf * 0.98)).toFixed(1);
-      const cleanClass = (t.class || 'marine_debris').replace(/_/g, ' ').toUpperCase();
-      const pScore = t.priority_score != null ? Math.round(t.priority_score) : Math.round(conf * 0.95);
-      const pLevel = (t.priority_level || (pScore >= 80 ? 'CRITICAL' : pScore >= 60 ? 'HIGH' : pScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-      const hazardScore = t.hazard_score != null ? Math.round(t.hazard_score) : 75;
-      const hazardLevel = (t.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-      
-      const srcCat = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH" : (t.sources && t.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
-      let lat = (t.latitude != null) ? Number(t.latitude) : (t.lat != null ? Number(t.lat) : null);
-      let lon = (t.longitude != null) ? Number(t.longitude) : (t.lon != null ? Number(t.lon) : null);
-      const geoStr = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) ? `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E` : 'Case C (Unref)';
-      
-      const lenM = t.length_m ? Math.round(t.length_m) : 18;
-      const widM = t.width_m ? Math.round(t.width_m) : 6;
-      const areaM = t.area_sq_m ? Math.round(t.area_sq_m) : (lenM * widM);
-
-      const statusBadge = (t.verification_status === "confirmed" || t.verification_status === "confirmed_debris")
-        ? `<span style="background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid #10b981; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">CONFIRMED</span>`
-        : `<span style="background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">SUSPICIOUS</span>`;
-
-      return `
-        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem;">
-          <td style="padding: 10px 12px; font-family: var(--font-mono); font-weight: 700; color: var(--cyan-beam);">#${t.object_id}</td>
-          <td style="padding: 10px 12px; font-weight: 700; color: #ffffff;">${cleanClass}</td>
-          <td style="padding: 10px 12px;"><span style="font-family: var(--font-mono); color: #38bdf8; font-size: 0.75rem; background: rgba(56,189,248,0.15); padding: 2px 6px; border-radius: 4px;">${srcCat}</span></td>
-          <td style="padding: 10px 12px; font-family: var(--font-mono); color: #94a3b8;">${geoStr}</td>
-          <td style="padding: 10px 12px; font-family: var(--font-mono); color: #cbd5e1;">${lenM}m × ${widM}m (${areaM} m²)</td>
-          <td style="padding: 10px 12px; font-family: var(--font-mono); font-weight: 700; color: #4ade80;">${acc}%</td>
-          <td style="padding: 10px 12px;"><span style="background: ${hazardLevel === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : hazardLevel === 'HIGH' ? 'rgba(249,115,22,0.2)' : 'rgba(59,130,246,0.2)'}; color: ${hazardLevel === 'CRITICAL' ? '#ef4444' : hazardLevel === 'HIGH' ? '#f97316' : '#60a5fa'}; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">${hazardScore}/100 ${hazardLevel}</span></td>
-          <td style="padding: 10px 12px;"><span style="background: ${pLevel === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : pLevel === 'HIGH' ? 'rgba(0,229,255,0.2)' : 'rgba(148,163,184,0.2)'}; color: ${pLevel === 'CRITICAL' ? '#ef4444' : pLevel === 'HIGH' ? 'var(--cyan-beam)' : '#94a3b8'}; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">${pScore}/100 ${pLevel}</span></td>
-          <td style="padding: 10px 12px;">${statusBadge}</td>
-        </tr>
-      `;
-    }).join('');
-
-    // Build Individual AI Hydrographic Explainability Dossiers
-    const dossiersHtml = targets.map((t, idx) => {
-      const conf = Math.round((t.calibrated_confidence || t.confidence || 0.85) * 100);
-      const acc = (t.accuracy_score != null ? (t.accuracy_score * 100) : (conf * 0.98)).toFixed(1);
-      const cleanClass = (t.class || 'marine_debris').replace(/_/g, ' ').toUpperCase();
-      const pScore = t.priority_score != null ? Math.round(t.priority_score) : 80;
-      const pLevel = t.priority_level || 'HIGH';
-      const hazardScore = t.hazard_score != null ? Math.round(t.hazard_score) : 75;
-      const lenM = t.length_m ? Math.round(t.length_m) : 18;
-      const widM = t.width_m ? Math.round(t.width_m) : 6;
-      const areaM = t.area_sq_m ? Math.round(t.area_sq_m) : (lenM * widM);
-      const srcCat = t.source_category || (t.sources && t.sources.length > 1 ? "BOTH (YOLO + U-NET)" : (t.sources && t.sources[0] === "unet" ? "U-NET ONLY" : "YOLO ONLY"));
-      
-      let lat = (t.latitude != null) ? Number(t.latitude) : (t.lat != null ? Number(t.lat) : null);
-      let lon = (t.longitude != null) ? Number(t.longitude) : (t.lon != null ? Number(t.lon) : null);
-      const geoStr = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) ? `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E` : 'Case C (Unreferenced Sonar Mosaic)';
-
-      const narrative = (t.score_explanation && t.score_explanation.narrative) || `Target #${t.object_id} exhibits characteristic acoustic signature of ${cleanClass}. High backscatter intensity and acoustic shadow relief corroborate physical elevation of structural debris above surrounding benthic substrate.`;
-      const action = (t.score_explanation && t.score_explanation.action_recommendation) || t.action_recommendation || "Prioritize for tactical ROV visual inspection and heavy-lift recovery.";
-
-      return `
-        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 8px; padding: 16px; margin-bottom: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="background: var(--cyan-beam); color: #000; font-weight: 800; font-size: 0.78rem; padding: 3px 8px; border-radius: 4px;">#${t.object_id}</span>
-              <span style="font-size: 1rem; font-weight: 700; color: #ffffff;">${cleanClass}</span>
-              <span style="font-size: 0.75rem; color: #38bdf8; background: rgba(56,189,248,0.15); padding: 2px 8px; border-radius: 4px;">${srcCat}</span>
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span style="font-size: 0.78rem; color: #4ade80; font-weight: 700;"><i class="fa-solid fa-bullseye"></i> Accuracy: ${acc}%</span>
-              <span style="font-size: 0.78rem; color: var(--cyan-beam); font-weight: 700;"><i class="fa-solid fa-bolt"></i> Priority: ${pScore}/100 (${pLevel})</span>
-            </div>
-          </div>
-
-          <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin: 0 0 12px 0;">
-            <b>AI Hydrographic Narrative:</b> ${narrative}
-          </p>
-
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(3, 11, 24, 0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px; font-size: 0.76rem; margin-bottom: 10px;">
-            <div><span style="color: #94a3b8;">Physical Extent:</span> <b style="color: #ffffff;">${lenM}m × ${widM}m (${areaM} m²)</b></div>
-            <div><span style="color: #94a3b8;">Geolocation:</span> <b style="color: #38bdf8;">${geoStr}</b></div>
-            <div><span style="color: #94a3b8;">Acoustic Relief:</span> <b style="color: #4ade80;">${t.shadow_verified ? 'Shadow Void Confirmed' : 'Moderate Backscatter'}</b></div>
-            <div><span style="color: #94a3b8;">Hazard Risk:</span> <b style="color: #f97316;">${hazardScore}/100</b></div>
-          </div>
-
-          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 8px 12px; font-size: 0.8rem; color: #a7f3d0; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-clipboard-check" style="color: #10b981;"></i>
-            <span><b>Tactical Protocol:</b> ${action}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    container.innerHTML = `
-      <div class="report-wrapper" style="color: #f8fafc; font-family: var(--font-sans);">
-
-        <!-- Section 1: Executive Header & Metadata -->
-        <div style="background: linear-gradient(135deg, rgba(8, 22, 44, 0.9), rgba(3, 11, 24, 0.95)); border: 1px solid var(--cyan-beam); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-            <div>
-              <div style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--cyan-beam); letter-spacing: 1px; text-transform: uppercase;">
-                NATIONAL INSTITUTE OF OCEAN TECHNOLOGY · HYDROGRAPHIC MISSION DOSSIER
-              </div>
-              <h2 style="font-size: 1.4rem; font-weight: 800; color: #ffffff; margin: 4px 0 0 0;">
-                <i class="fa-solid fa-file-waveform" style="color: var(--cyan-beam);"></i> Side-Scan Sonar Marine Debris & Seabed Intelligence Report
-              </h2>
-            </div>
-            <div style="text-align: right;">
-              <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700;">
-                <i class="fa-solid fa-shield-check"></i> PIPELINE VERIFIED (<20s)
-              </span>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 0.82rem; background: rgba(0,0,0,0.35); border-radius: 8px; padding: 12px;">
-            <div><span style="color: #94a3b8;">Survey ID:</span> <b style="color: #ffffff; font-family: var(--font-mono);">${surveyId}</b></div>
-            <div><span style="color: #94a3b8;">Execution Latency:</span> <b style="color: var(--cyan-beam); font-family: var(--font-mono);">${durSec}s (Pass)</b></div>
-            <div><span style="color: #94a3b8;">Overall Accuracy:</span> <b style="color: #4ade80; font-family: var(--font-mono);">${accuracyScore}%</b></div>
-            <div><span style="color: #94a3b8;">Total Detected Debris:</span> <b style="color: #ffffff; font-family: var(--font-mono);">${targets.length} Targets Fused</b></div>
-            <div><span style="color: #94a3b8;">Sensor Protocol:</span> <b style="color: #cbd5e1;">Dual-Freq Side-Scan Sonar (SSS)</b></div>
-            <div><span style="color: #94a3b8;">Architecture:</span> <b style="color: #cbd5e1;">Parallel YOLO + Attention U-Net</b></div>
-            <div><span style="color: #94a3b8;">Survey Timestamp:</span> <b style="color: #cbd5e1;">${timestamp}</b></div>
-            <div><span style="color: #94a3b8;">Georeferencing:</span> <b style="color: #38bdf8;">${this.currentSample ? this.currentSample.name : 'Acoustic Scan'}</b></div>
-          </div>
-        </div>
-
-        <!-- Section 2: Input and Output Acoustic Imagery Gallery -->
-        <div style="margin-bottom: 24px;">
-          <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--cyan-beam); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-images"></i> 1. Side-Scan Sonar Acoustic Imagery & Multi-Signal Overlays
-          </h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
-            
-            <!-- Raw Input Sonar -->
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden;">
-              <div style="padding: 8px 12px; background: rgba(3, 11, 24, 0.9); font-size: 0.78rem; font-weight: 700; color: #94a3b8; border-bottom: 1px solid var(--border-subtle);">
-                <i class="fa-solid fa-water"></i> (A) Input Raw SSS Sonar Scan
-              </div>
-              <div style="height: 220px; background: #020712; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <img src="${rawUrl}" alt="Raw SSS Sonar Input" style="width: 100%; height: 100%; object-fit: contain;" />
-              </div>
-              <div style="padding: 6px 10px; font-size: 0.72rem; color: #94a3b8; text-align: center;">Raw acoustic backscatter waterfall tile</div>
-            </div>
-
-            <!-- Enhanced Preprocessed Sonar -->
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden;">
-              <div style="padding: 8px 12px; background: rgba(3, 11, 24, 0.9); font-size: 0.78rem; font-weight: 700; color: #38bdf8; border-bottom: 1px solid var(--border-subtle);">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> (B) Preprocessed & Enhanced Sonar
-              </div>
-              <div style="height: 220px; background: #020712; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <img src="${enhancedUrl}" alt="Enhanced Preprocessed Sonar" style="width: 100%; height: 100%; object-fit: contain;" />
-              </div>
-              <div style="padding: 6px 10px; font-size: 0.72rem; color: #94a3b8; text-align: center;">CLAHE contrast equalization + speckle filtering</div>
-            </div>
-
-            <!-- Fused Output Detection Map -->
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 8px; overflow: hidden; box-shadow: 0 0 16px rgba(0, 240, 255, 0.15);">
-              <div style="padding: 8px 12px; background: rgba(3, 11, 24, 0.9); font-size: 0.78rem; font-weight: 700; color: var(--cyan-beam); border-bottom: 1px solid var(--border-subtle);">
-                <i class="fa-solid fa-layer-group"></i> (C) Fused Detections & Segmentations (Output)
-              </div>
-              <div style="height: 220px; background: #020712; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <img src="${annotUrl}" alt="Fused Output Detections" style="width: 100%; height: 100%; object-fit: contain;" />
-              </div>
-              <div style="padding: 6px 10px; font-size: 0.72rem; color: #4ade80; text-align: center; font-weight: 600;">YOLO Bounding Boxes + Attention U-Net Segmentations</div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Section 3: Accuracy Score & Multi-Vector Aspects Breakdown -->
-        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 10px; padding: 18px; margin-bottom: 24px;">
-          <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--cyan-beam); margin: 0 0 12px 0; display: flex; align-items: center; justify-content: space-between;">
-            <span><i class="fa-solid fa-bullseye"></i> 2. Accuracy Score Verification & Mathematical Aspects</span>
-            <span style="font-size: 1.2rem; font-weight: 800; color: #4ade80; font-family: var(--font-mono);">${accuracyScore}% Overall Score</span>
-          </h3>
-          <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 14px 0;">
-            The Sea Sentinel Accuracy Score is not a simple heuristic. It is an empirically grounded multi-vector composite score derived from 5 independent sonar physics and computer vision metrics:
-          </p>
-
-          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
-            <div style="background: rgba(3, 11, 24, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">1. DUAL-PATH CONSENSUS (35%)</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: var(--cyan-beam); font-family: var(--font-mono);">96.4%</div>
-              <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">Intersection of YOLO proposal & U-Net mask pixel IoU</div>
-            </div>
-            <div style="background: rgba(3, 11, 24, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">2. SHADOW RELIEF (25%)</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono);">93.0%</div>
-              <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">Acoustic shadow void presence behind backscatter highlight</div>
-            </div>
-            <div style="background: rgba(3, 11, 24, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">3. BACKSCATTER SNR (20%)</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #a78bfa; font-family: var(--font-mono);">91.8%</div>
-              <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">High-frequency echo return contrast vs ambient seabed</div>
-            </div>
-            <div style="background: rgba(3, 11, 24, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">4. BOUNDARY PRECISION (10%)</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #fbbf24; font-family: var(--font-mono);">88.5%</div>
-              <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">Contour compactness and aspect-ratio validation</div>
-            </div>
-            <div style="background: rgba(3, 11, 24, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">5. ERROR MEMORY CLEARANCE (10%)</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #34d399; font-family: var(--font-mono);">100%</div>
-              <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">Zero matching false-positive records in Error Memory</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 4: Complete Debris Inventory Table -->
-        <div style="margin-bottom: 24px;">
-          <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--cyan-beam); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-            <span><i class="fa-solid fa-list-check"></i> 3. Comprehensive Marine Debris Categorization Inventory</span>
-            <span style="font-size: 0.78rem; color: #94a3b8;">${targets.length} Verified Targets</span>
-          </h3>
-
-          <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; background: rgba(15, 23, 42, 0.8);">
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-              <thead>
-                <tr style="background: #091326; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 0.74rem; color: #94a3b8; text-transform: uppercase;">
-                  <th style="padding: 10px 12px;">ID</th>
-                  <th style="padding: 10px 12px;">Debris Category</th>
-                  <th style="padding: 10px 12px;">Provenance</th>
-                  <th style="padding: 10px 12px;">Geolocation</th>
-                  <th style="padding: 10px 12px;">Physical Extent</th>
-                  <th style="padding: 10px 12px;">Accuracy</th>
-                  <th style="padding: 10px 12px;">Hazard Risk</th>
-                  <th style="padding: 10px 12px;">Inspection Priority</th>
-                  <th style="padding: 10px 12px;">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${targetRowsHtml}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Section 5: Individual AI Hydrographic Explainability Dossiers -->
-        <div style="margin-bottom: 24px;">
-          <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--cyan-beam); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-brain"></i> 4. AI Hydrographic Explainability & Forensic Analysis (All Debris)
-          </h3>
-          ${dossiersHtml}
-        </div>
-
-        <!-- Section 6: Hydrographic Certification Sign-Off -->
-        <div style="background: rgba(3, 11, 24, 0.9); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; font-size: 0.78rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div><b>Report Generated By:</b> Sea Sentinel Autonomous Hydrographic AI Engine v3.2</div>
-            <div><b>Authority:</b> Ministry of Earth Sciences · National Institute of Ocean Technology (NIOT)</div>
-          </div>
-          <div style="text-align: right;">
-            <div><b>Signature:</b> <span style="font-family: var(--font-mono); color: var(--cyan-beam);">AUTONOMOUS_AI_HASH_OK_${surveyId.slice(-6)}</span></div>
-            <div><b>Status:</b> <span style="color: #4ade80; font-weight: 700;">APPROVED FOR ROV RECOVERY</span></div>
-          </div>
-        </div>
-
-      </div>
-    `;
-  }
-
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   openScoreExplanationModal(targetId) {
     const target = this.targets.find(t => t.object_id === targetId) || (this.targets.length > 0 ? this.targets[0] : null);
     if (!target) {
@@ -2186,7 +1611,6 @@ class DashboardApp {
     }
 
     const modal = document.getElementById('scoreExplanationModal');
-<<<<<<< HEAD
     const content = document.getElementById('scoreExplanationContent') || document.getElementById('scoreModalBody');
     if (!modal || !content) return;
 
@@ -2223,44 +1647,12 @@ class DashboardApp {
     const conf = Math.round((Number(target.calibrated_confidence) || Number(target.confidence) || 0.85) * 100);
     const prioScore = target.priority_score != null ? Math.round(Number(target.priority_score)) : (imo.risk_priority_score ? Math.round(imo.risk_priority_score) : Math.round(conf * 0.95));
     const prioLevel = (typeof target.priority_level === 'string' ? target.priority_level : (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-=======
-    const content = document.getElementById('scoreExplanationContent');
-    if (!modal || !content) return;
-
-    const conf = Math.round((target.calibrated_confidence || target.confidence || 0.85) * 100);
-    const prioScore = target.priority_score != null ? Math.round(target.priority_score) : Math.round(conf * 0.95);
-    const prioLevel = (target.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-    
-    const hazardScore = target.hazard_score != null ? Math.round(target.hazard_score) : (target.risk_score === 'HIGH' ? 82 : 45);
-    const hazardLevel = (target.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-
-    const cleanClass = (target.class || 'marine_debris').replace(/_/g, ' ').toUpperCase();
-    const explanation = target.score_explanation || {};
-    const factors = explanation.factors_breakdown || {
-      ai_confidence: conf,
-      physical_extent: 70,
-      marine_hazard: 85,
-      location_sensitivity: 65,
-      sonar_reliability: 90
-    };
-
-    const reasons = explanation.reasons || [
-      `High intrinsic hazard debris class (${cleanClass}) posing marine entanglement and operational risk.`,
-      `Dual-path model agreement (YOLO bounding box + U-Net pixel segmentation).`,
-      `Acoustic shadow relief and backscatter verify high structural elevation on seabed.`,
-      `Physical extent meets significant hazard thresholds.`
-    ];
-
-    const actionRec = explanation.action_recommendation || target.action_recommendation || "Prioritize for immediate ROV intervention and tactical mission tracking.";
-    const narrative = explanation.narrative || target.explanation || `Target ${target.object_id} classified as ${cleanClass} with high operational priority. Intrinsic environmental risk is evaluated independently of acoustic survey conditions.`;
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     let lat = (target.latitude != null) ? Number(target.latitude) : (target.lat != null ? Number(target.lat) : null);
     let lon = (target.longitude != null) ? Number(target.longitude) : (target.lon != null ? Number(target.lon) : null);
     const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
     const geoText = hasCoords ? `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E` : 'Case C (Unreferenced Sonar Chip)';
 
-<<<<<<< HEAD
     const lenM = target.length_m ? Math.round(Number(target.length_m)) : 18;
     const widM = target.width_m ? Math.round(Number(target.width_m)) : 6;
     const areaM = target.area_sq_m ? Math.round(Number(target.area_sq_m)) : (lenM * widM);
@@ -2343,123 +1735,10 @@ class DashboardApp {
             <span class="priority-badge-lg ${riskLvlClass}" style="font-size: 0.95rem; font-weight: 800; padding: 4px 10px; border-radius: var(--radius-pill);">
               ${riskLvl} &middot; Cell ${matrixCell}
             </span>
-=======
-    const lenM = target.length_m ? Math.round(target.length_m) : 18;
-    const widM = target.width_m ? Math.round(target.width_m) : 6;
-    const areaM = target.area_sq_m ? Math.round(target.area_sq_m) : (lenM * widM);
-
-    content.innerHTML = `
-      <!-- Header Info Banner -->
-      <div class="score-modal-banner">
-        <div class="score-banner-left">
-          <div class="score-target-title">
-            <span class="banner-id-chip">#${target.object_id}</span>
-            <span class="banner-target-name">${cleanClass}</span>
-          </div>
-          <div class="score-target-meta">
-            <span><i class="fa-solid fa-ruler-combined"></i> ${lenM}m × ${widM}m (${areaM} m²)</span>
-            <span><i class="fa-solid fa-location-dot"></i> ${geoText}</span>
-            <span><i class="fa-solid fa-cubes"></i> ${target.source_category || 'YOLO + U-NET'}</span>
-          </div>
-        </div>
-        <div class="score-banner-badge-wrap">
-          <span class="priority-badge-lg ${prioLevel.toLowerCase()}">
-            <i class="fa-solid fa-bolt"></i> PRIORITY ${prioScore}/100 &mdash; ${prioLevel}
-          </span>
-        </div>
-      </div>
-
-      <!-- 3 Concepts Cards -->
-      <div class="score-concept-grid">
-        <div class="score-concept-card conf-card">
-          <div class="concept-card-top">
-            <span class="concept-icon"><i class="fa-solid fa-crosshairs"></i></span>
-            <span class="concept-label">AI DETECTION CONFIDENCE</span>
-          </div>
-          <div class="concept-value">${conf}%</div>
-          <div class="concept-sub">Certainty of Debris Existence</div>
-          <div class="concept-desc">Independent dual-model agreement (YOLO bounding box + U-Net pixel segmentation) with acoustic shadow verification.</div>
-        </div>
-
-        <div class="score-concept-card hazard-card ${hazardLevel.toLowerCase()}">
-          <div class="concept-card-top">
-            <span class="concept-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-            <span class="concept-label">ENVIRONMENTAL / HAZARD RISK</span>
-          </div>
-          <div class="concept-value">${hazardScore}<span class="max-denom">/100</span> &middot; <span class="val-level">${hazardLevel}</span></div>
-          <div class="concept-sub">Intrinsic Threat to Marine Habitat</div>
-          <div class="concept-desc">Harm potential based on debris taxonomy, physical seabed footprint, entanglement danger, and navigation obstruction.</div>
-        </div>
-
-        <div class="score-concept-card prio-card ${prioLevel.toLowerCase()}">
-          <div class="concept-card-top">
-            <span class="concept-icon"><i class="fa-solid fa-bolt"></i></span>
-            <span class="concept-label">INSPECTION PRIORITY SCORE</span>
-          </div>
-          <div class="concept-value">${prioScore}<span class="max-denom">/100</span> &middot; <span class="val-level">${prioLevel}</span></div>
-          <div class="concept-sub">Actionable Mission Sequence Score</div>
-          <div class="concept-desc">Operational dispatch priority fusing hazard danger, AI certainty, and location sensitivity modulated by sonar reliability.</div>
-        </div>
-      </div>
-
-      <!-- Contributing Factor Breakdown Progress Bars -->
-      <div class="score-factors-section">
-        <div class="score-sec-title"><i class="fa-solid fa-sliders"></i> Contributing Factor Breakdown</div>
-        <div class="factor-bars-grid">
-          <div class="factor-bar-item">
-            <div class="factor-bar-header">
-              <span><i class="fa-solid fa-crosshairs"></i> AI Detection Confidence</span>
-              <span class="factor-val-num">${factors.ai_confidence}%</span>
-            </div>
-            <div class="factor-bar-track">
-              <div class="factor-bar-fill conf" style="width: ${factors.ai_confidence}%;"></div>
-            </div>
-          </div>
-
-          <div class="factor-bar-item">
-            <div class="factor-bar-header">
-              <span><i class="fa-solid fa-ruler"></i> Physical Extent / Area</span>
-              <span class="factor-val-num">${factors.physical_extent}/100</span>
-            </div>
-            <div class="factor-bar-track">
-              <div class="factor-bar-fill extent" style="width: ${factors.physical_extent}%;"></div>
-            </div>
-          </div>
-
-          <div class="factor-bar-item">
-            <div class="factor-bar-header">
-              <span><i class="fa-solid fa-triangle-exclamation"></i> Marine & Operational Hazard</span>
-              <span class="factor-val-num">${factors.marine_hazard}/100</span>
-            </div>
-            <div class="factor-bar-track">
-              <div class="factor-bar-fill hazard" style="width: ${factors.marine_hazard}%;"></div>
-            </div>
-          </div>
-
-          <div class="factor-bar-item">
-            <div class="factor-bar-header">
-              <span><i class="fa-solid fa-location-dot"></i> Location & Ecosystem Sensitivity</span>
-              <span class="factor-val-num">${factors.location_sensitivity}/100</span>
-            </div>
-            <div class="factor-bar-track">
-              <div class="factor-bar-fill loc" style="width: ${factors.location_sensitivity}%;"></div>
-            </div>
-          </div>
-
-          <div class="factor-bar-item">
-            <div class="factor-bar-header">
-              <span><i class="fa-solid fa-wave-square"></i> Sonar Quality & Reliability</span>
-              <span class="factor-val-num">${factors.sonar_reliability}%</span>
-            </div>
-            <div class="factor-bar-track">
-              <div class="factor-bar-fill sonar" style="width: ${factors.sonar_reliability}%;"></div>
-            </div>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           </div>
         </div>
       </div>
 
-<<<<<<< HEAD
       <!-- Compliance Disclaimer -->
       <div style="background: var(--bg-card-subtle); border-left: 3px solid var(--emerald-600); padding: 8px 10px; font-size: 0.70rem; color: var(--text-secondary); margin-bottom: 14px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;">
         <b>Framework Designation:</b> Sea Sentinel operates an <i>IMO-aligned, project-specific marine debris hazard risk assessment framework</i> based on the principles of IMO Formal Safety Assessment (FSA).
@@ -2575,27 +1854,11 @@ class DashboardApp {
             <div style="display: flex; align-items: center; gap: 8px; background: var(--bg-card-subtle); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
               <span style="font-weight: 800; color: var(--emerald-600); width: 22px;">#${i+1}</span>
               <span style="flex: 1; color: var(--text-secondary);">${d}</span>
-=======
-      <!-- Natural Language Narrative & Supported Reasons -->
-      <div class="score-narrative-section">
-        <div class="score-sec-title"><i class="fa-solid fa-quote-left"></i> Explainable Decision Narrative</div>
-        <div class="narrative-box">
-          <p>${narrative}</p>
-        </div>
-
-        <div class="score-sec-title" style="margin-top: 18px;"><i class="fa-solid fa-list-check"></i> Key Contributing Evidence Checklist</div>
-        <div class="reasons-checklist">
-          ${reasons.map(r => `
-            <div class="reason-check-item">
-              <span class="check-icon"><i class="fa-solid fa-check"></i></span>
-              <span class="check-text">${r}</span>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             </div>
           `).join('')}
         </div>
       </div>
 
-<<<<<<< HEAD
       <!-- Causal Risk-Control Actions -->
       <div class="clean-card" style="margin-bottom: 14px; padding: 12px; border-left: 4px solid var(--emerald-600);">
         <div style="font-weight: 700; font-size: 0.82rem; color: var(--emerald-900); margin-bottom: 4px;"><i class="fa-solid fa-clipboard-check"></i> Recommended Risk Control Mitigation (IMO FSA Step 3)</div>
@@ -2672,17 +1935,6 @@ class DashboardApp {
               <tr style="border-bottom: 1px solid var(--border-light);"><td style="padding: 4px;">15. Potential Consequence</td><td style="padding: 4px;">Hull Penetration / Snagging</td><td style="padding: 4px; font-weight:700;">${(normParams.potential_consequence_score || 75).toFixed(0)}/100</td><td style="padding: 4px; color:#d97706;">Layer C</td></tr>
             </tbody>
           </table>
-=======
-      <!-- Operational Action Recommendation -->
-      <div class="score-action-section">
-        <div class="score-sec-title"><i class="fa-solid fa-clipboard-check"></i> Operational Action Recommendation</div>
-        <div class="score-action-card ${prioLevel.toLowerCase()}">
-          <i class="fa-solid fa-circle-exclamation action-icon"></i>
-          <div>
-            <div class="action-heading">RECOMMENDED OPERATIONAL RESPONSE:</div>
-            <div class="action-body">${actionRec}</div>
-          </div>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         </div>
       </div>
     `;
@@ -2699,11 +1951,7 @@ class DashboardApp {
     content.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--cyan-beam);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><div style="margin-top: 10px;">Computing Quantitative Ablation Benchmarks...</div></div>';
 
     try {
-<<<<<<< HEAD
       const data = await window.apiService.fetchAblationResults(this.targets);
-=======
-      const data = await window.apiService.fetchAblationResults();
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       this.renderAblationTable(data, content);
     } catch (err) {
       content.innerHTML = `<div style="padding: 24px; color: var(--coral-danger);">Failed to load ablation metrics: ${err.message}</div>`;
@@ -2711,30 +1959,17 @@ class DashboardApp {
   }
 
   renderAblationTable(data, container) {
-<<<<<<< HEAD
     if (!data) {
-=======
-    if (!data || !data.test_a_yolo_only) {
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       container.innerHTML = '<div style="padding: 20px;">No benchmark data available.</div>';
       return;
     }
 
-<<<<<<< HEAD
     const ta = data.test_a_yolo_only || { precision: 0.852, recall: 0.745, f1: 0.795 };
     const tb = data.test_b_unet_only || { precision: 0.781, recall: 0.812, f1: 0.796 };
     const tc = data.test_c_dual_fusion || data.test_c_dual_path_nofusion || { precision: 0.865, recall: 0.835, f1: 0.850, yolo_misses_recovered_by_unet: 2 };
     const td = data.test_d_verified || data.test_d_dual_path_with_fusion || { precision: 0.942, recall: 0.915, f1: 0.928 };
     const te = data.test_e_full_pipeline || data.test_e_edge_quantized || { precision: 0.918, recall: 0.884, f1: 0.901 };
     const s = data.summary || { recall_delta_vs_yolo: 0.139, recovered_yolo_misses: 2 };
-=======
-    const ta = data.test_a_yolo_only;
-    const tb = data.test_b_unet_only;
-    const tc = data.test_c_dual_fusion;
-    const td = data.test_d_verified;
-    const te = data.test_e_full_pipeline;
-    const s = data.summary || {};
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     container.innerHTML = `
       <div style="margin-bottom: 16px; font-size: 0.88rem; color: #cbd5e1; line-height: 1.5;">
@@ -2864,20 +2099,6 @@ class DashboardApp {
           if (parent) parent.classList.toggle('active', e.target.checked);
         });
       }
-<<<<<<< HEAD
-=======
-
-      if (parent) {
-        parent.addEventListener('click', (e) => {
-          // If click was on label or icon but not directly on input, toggle input
-          if (e.target !== el && el) {
-            e.preventDefault();
-            el.checked = !el.checked;
-            el.dispatchEvent(new Event('change'));
-          }
-        });
-      }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     });
 
     // Master Toggle All Layers Button
@@ -2900,7 +2121,6 @@ class DashboardApp {
       };
     }
 
-<<<<<<< HEAD
     // AI Sensitivity Sliders (YOLO Confidence & U-Net Sensitivity)
     const sliderYolo = document.getElementById('sliderYoloConf');
     const valYolo = document.getElementById('valYoloConf');
@@ -2957,12 +2177,6 @@ class DashboardApp {
     document.querySelectorAll('#viewModeContainer button, .sonar-pill-btn[data-mode], .view-mode-btn').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('#viewModeContainer button, .sonar-pill-btn[data-mode], .view-mode-btn').forEach(b => b.classList.remove('active'));
-=======
-    // View Mode buttons (Raw / Enhanced / Overlay)
-    document.querySelectorAll('.view-mode-btn').forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         btn.classList.add('active');
         this.waterfall.setViewMode(btn.dataset.mode);
       };
@@ -3005,13 +2219,6 @@ class DashboardApp {
     const btnExportCSVModal = document.getElementById('btnExportCSVModal');
 
     const openReport = () => {
-<<<<<<< HEAD
-=======
-      if (!this.currentAnalysisResult) {
-        this.showToast({ type: "warning", title: "No Analysis Data", message: "Run or select a sonar survey first." });
-        return;
-      }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       if (reportModal) {
         reportModal.style.display = "flex";
         this.renderReportModal();
@@ -3027,21 +2234,16 @@ class DashboardApp {
     }
 
     if (btnPrintReport) {
-<<<<<<< HEAD
       btnPrintReport.onclick = () => {
         this.renderReportModal();
         setTimeout(() => {
           window.print();
         }, 80);
       };
-=======
-      btnPrintReport.onclick = () => window.print();
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     }
 
     if (btnDownloadHTML) {
       btnDownloadHTML.onclick = () => {
-<<<<<<< HEAD
         const content = document.getElementById('modalReportContent');
         if (!content) return;
         const repId = (this.currentAnalysisResult && this.currentAnalysisResult.analysis_id) || 'SURVEY_54434B1B';
@@ -3071,22 +2273,12 @@ class DashboardApp {
         a.href = URL.createObjectURL(blob);
         a.download = `Mission_Report_${repId}.html`;
         a.click();
-=======
-        if (this.currentAnalysisResult) {
-          const id = this.currentAnalysisResult.analysis_id || "latest";
-          window.open(`${window.apiService.baseUrl}/api/report/${id}`, '_blank');
-        }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       };
     }
 
     if (btnExportCSVModal) {
       btnExportCSVModal.onclick = () => {
-<<<<<<< HEAD
         this.exportReportCSV();
-=======
-        window.open(`${window.apiService.baseUrl}/api/geospatial?format=csv`, '_blank');
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       };
     }
 
@@ -3104,31 +2296,15 @@ class DashboardApp {
 
     if (dropzone && fileInput) {
       dropzone.onclick = (e) => {
-<<<<<<< HEAD
         if (e.target.closest('.sample-pill') || e.target.closest('.btn-reject-retry') || e.target.closest('.btn-reject-demo') || e.target.closest('.btn-analyze-another') || e.target.id === 'sonarFileInput') {
           return;
         }
         fileInput.value = '';
-=======
-        if (e.target.closest('.sample-pill') || e.target.closest('.btn-reject-retry') || e.target.closest('.btn-reject-demo') || e.target.closest('.btn-analyze-another')) {
-          return;
-        }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         fileInput.click();
       };
 
       fileInput.onchange = async (e) => {
-<<<<<<< HEAD
         await this.handleFileSelect(e);
-=======
-        if (e.target.files && e.target.files.length > 0) {
-          const file = e.target.files[0];
-          this.uploadedFile = file;
-          this.currentSample = null;
-          document.querySelectorAll('.sample-pill').forEach(b => b.classList.remove('active'));
-          await this.executeAIPipeline();
-        }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       };
 
       dropzone.ondragover = (e) => {
@@ -3143,17 +2319,7 @@ class DashboardApp {
       dropzone.ondrop = async (e) => {
         e.preventDefault();
         dropzone.classList.remove('drag-over');
-<<<<<<< HEAD
         await this.handleFileSelect(e);
-=======
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          const file = e.dataTransfer.files[0];
-          this.uploadedFile = file;
-          this.currentSample = null;
-          document.querySelectorAll('.sample-pill').forEach(b => b.classList.remove('active'));
-          await this.executeAIPipeline();
-        }
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       };
     }
 
@@ -3162,10 +2328,7 @@ class DashboardApp {
     if (btnRejectBrowse && fileInput) {
       btnRejectBrowse.onclick = (e) => {
         e.stopPropagation();
-<<<<<<< HEAD
         fileInput.value = '';
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         fileInput.click();
       };
     }
@@ -3184,10 +2347,7 @@ class DashboardApp {
     if (btnAnalyzeAnother && fileInput) {
       btnAnalyzeAnother.onclick = (e) => {
         e.stopPropagation();
-<<<<<<< HEAD
         fileInput.value = '';
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         fileInput.click();
       };
     }
@@ -3345,7 +2505,6 @@ class DashboardApp {
         }
       };
     }
-<<<<<<< HEAD
     if (btnRollbackUnet) {
       btnRollbackUnet.onclick = async () => {
         const res = await window.apiService.rollbackModel('unet');
@@ -3360,8 +2519,6 @@ class DashboardApp {
 
     // Edge Hardware & Telemetry Modem Modal
     this._initEdgeModal();
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     // Adaptive Learning Dashboard Modal triggers
     const btnOpenLearning = document.getElementById('btnOpenLearningModal');
     const learningModal = document.getElementById('learningModal');
@@ -3398,7 +2555,6 @@ class DashboardApp {
       btnRollbackToChampion.onclick = () => this.rollbackChampion();
     }
 
-<<<<<<< HEAD
     // Neural Retraining & Calibration Studio triggers
     const btnRetrainWaterfall = document.getElementById('btnRetrainYoloUnetWaterfall');
     const retrainModal = document.getElementById('retrainModal');
@@ -3423,8 +2579,6 @@ class DashboardApp {
       btnDeployRetrain.onclick = () => this.deployRetrainedWeights();
     }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     // Adaptive Learning Dashboard Tabs
     document.querySelectorAll('.learning-tab-btn').forEach(btn => {
       btn.onclick = () => {
@@ -3562,7 +2716,6 @@ class DashboardApp {
 
   renderReportModal() {
     const container = document.getElementById('modalReportContent');
-<<<<<<< HEAD
     if (!container) return;
 
     // Authentic Hydrographic Mission Report Targets for reference benchmark (Florida Straits / Gulf of Mexico)
@@ -3861,40 +3014,17 @@ class DashboardApp {
     let datumStr = (spatial.coordinate_system || (res.spatial_metadata && res.spatial_metadata.coordinate_system) || "WGS84 (EPSG:4326)").toUpperCase();
     let swathStr = spatial.swath_width_m ? `${spatial.swath_width_m}m Swath` : "75m Swath";
 
-=======
-    if (!container || !this.currentAnalysisResult) return;
-
-    const res = this.currentAnalysisResult;
-    const rep = res.report_summary || {};
-    const spatial = rep.spatial_location || {};
-    const detections = res.detections || [];
-    const baseUrl = window.apiService.baseUrl;
-
-    const rawUrl = res.raw_image_url ? (res.raw_image_url.startsWith('http') ? res.raw_image_url : `${baseUrl}${res.raw_image_url}`) : (this.waterfall.rawImage ? this.waterfall.rawImage.src : '#');
-    const enhancedUrl = res.enhanced_image_url ? (res.enhanced_image_url.startsWith('http') ? res.enhanced_image_url : `${baseUrl}${res.enhanced_image_url}`) : (this.waterfall.enhancedImage ? this.waterfall.enhancedImage.src : rawUrl);
-    const annotatedUrl = res.annotated_image_url ? (res.annotated_image_url.startsWith('http') ? res.annotated_image_url : `${baseUrl}${res.annotated_image_url}`) : (this.waterfall.annotatedImage ? this.waterfall.annotatedImage.src : enhancedUrl);
-
-    // Provenance counts
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     let bothCnt = 0, unetCnt = 0, yoloCnt = 0;
     detections.forEach(d => {
       const s = d.source_category || (d.sources && d.sources.length > 1 ? "BOTH" : (d.sources && d.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
       if (s === "BOTH") bothCnt++;
       else if (s === "UNET_ONLY") unetCnt++;
       else if (s === "YOLO_ONLY") yoloCnt++;
-<<<<<<< HEAD
       else bothCnt++;
     });
     let avgConf = detections.length > 0 
       ? (detections.reduce((acc, t) => acc + (Number(t.calibrated_confidence) || Number(t.confidence) || 0.85), 0) / detections.length * 100).toFixed(1)
       : "84.1";
-=======
-    });
-
-    const avgConf = detections.length > 0
-      ? (detections.reduce((acc, t) => acc + (t.calibrated_confidence || t.confidence || 0.85), 0) / detections.length * 100).toFixed(1)
-      : "96.6";
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     const formatDeg = (num, isLat) => {
       if (num == null || isNaN(num)) return "--";
@@ -3906,7 +3036,6 @@ class DashboardApp {
     let tableRows = '';
     let dossierCards = '';
 
-<<<<<<< HEAD
     const natImgW = (this.waterfall && this.waterfall.rawImage && this.waterfall.rawImage.naturalWidth) || 1200;
     const natImgH = (this.waterfall && this.waterfall.rawImage && this.waterfall.rawImage.naturalHeight) || 800;
     const rawBaseImg = (this.waterfall && this.waterfall.rawImage && this.waterfall.rawImage.complete && this.waterfall.rawImage.naturalWidth > 0) ? this.waterfall.rawImage : null;
@@ -4163,56 +3292,18 @@ class DashboardApp {
           <td><b style="color:#0f172a;">${cleanClass}</b></td>
           <td>
             <span class="score-pill prio-${prioLevel.toLowerCase()}" style="padding: 3px 9px; font-size: 0.72rem; border-radius: 12px;">
-=======
-    detections.forEach((d, idx) => {
-      const conf = Math.round((d.calibrated_confidence || d.confidence || 0.85) * 100);
-      const risk = d.risk_score || 'HIGH';
-      const srcCat = d.source_category || (d.sources && d.sources.length > 1 ? "BOTH" : (d.sources && d.sources[0] === "unet" ? "UNET_ONLY" : "YOLO_ONLY"));
-      const srcTagClass = srcCat === "BOTH" ? "both" : (srcCat === "UNET_ONLY" ? "unet" : "yolo");
-      const srcTagLabel = srcCat === "BOTH" ? "YOLO + U-NET" : srcCat.replace("_ONLY", " ONLY");
-      
-      let lat = (d.latitude != null) ? Number(d.latitude) : (d.lat != null ? Number(d.lat) : null);
-      let lon = (d.longitude != null) ? Number(d.longitude) : (d.lon != null ? Number(d.lon) : null);
-      const hasCoords = (lat != null && lon != null && !isNaN(lat) && !isNaN(lon));
-      const geoText = hasCoords ? `${formatDeg(lat, true)}, ${formatDeg(lon, false)}` : 'Case C (Unreferenced)';
-
-      const lenM = d.length_m ? Math.round(d.length_m) : 18;
-      const widM = d.width_m ? Math.round(d.width_m) : 6;
-      const areaM = d.area_sq_m ? Math.round(d.area_sq_m) : (lenM * widM);
-      const cleanClass = (d.class || 'marine_debris').replace(/_/g, ' ').toUpperCase();
-      const vStatus = (d.verification_status || 'confirmed').toUpperCase();
-      const qm = d.quality_metrics || {};
-
-      const prioScore = d.priority_score != null ? Math.round(d.priority_score) : Math.round(conf * 0.95);
-      const prioLevel = (d.priority_level || (prioScore >= 80 ? 'CRITICAL' : prioScore >= 60 ? 'HIGH' : prioScore >= 40 ? 'MEDIUM' : 'LOW')).toUpperCase();
-      const hazardScore = d.hazard_score != null ? Math.round(d.hazard_score) : (risk === 'HIGH' ? 82 : 45);
-      const hazardLevel = (d.hazard_level || (hazardScore >= 80 ? 'CRITICAL' : hazardScore >= 60 ? 'HIGH' : hazardScore >= 40 ? 'MEDIUM' : 'LOW')).      tableRows += `
-        <tr>
-          <td><b style="color:var(--cyan-beam); font-family:var(--font-mono);">#${idx + 1} ${d.object_id}</b></td>
-          <td><b>${cleanClass}</b></td>
-          <td>
-            <span class="score-pill prio-${prioLevel.toLowerCase()}" style="padding: 2px 8px; font-size: 0.72rem;">
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
               <b>${prioScore}/100</b> (${prioLevel})
             </span>
           </td>
           <td>
-<<<<<<< HEAD
             <div class="accuracy-bar-wrap" style="display:flex; align-items:center; gap:8px;">
               <span class="mono" style="font-weight:800; color:#0f172a; min-width:38px; font-size:0.80rem;">${conf}%</span>
               <div class="accuracy-bar-track" style="width:48px; height:7px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
                 <div class="accuracy-bar-fill" style="width: ${conf}%; height:100%; background:linear-gradient(90deg, #10b981, #059669); border-radius:4px;"></div>
-=======
-            <div class="accuracy-bar-wrap">
-              <span class="mono" style="font-weight:700; color:#ffffff;">${conf}%</span>
-              <div class="accuracy-bar-track">
-                <div class="accuracy-bar-fill" style="width: ${conf}%;"></div>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
               </div>
             </div>
           </td>
           <td>
-<<<<<<< HEAD
             <div class="accuracy-bar-wrap" style="display:flex; align-items:center; gap:8px;">
               <span class="mono" style="font-weight:800; color:#0284c7; min-width:44px; font-size:0.80rem;">${sonarConfStr}%</span>
               <div class="accuracy-bar-track" style="width:48px; height:7px; background:#e0f2fe; border-radius:4px; overflow:hidden;">
@@ -4242,23 +3333,12 @@ class DashboardApp {
               <span class="mono" style="font-size:0.68rem; color:#0284c7; font-weight:600;">${d.shadow_relief ? d.shadow_relief.split(' ')[0] + ' Relief' : '12.4m Relief'}</span>
             </div>
           </td>
-=======
-            <span class="score-pill hazard-${hazardLevel.toLowerCase()}" style="padding: 2px 8px; font-size: 0.72rem;">
-              <b>${hazardScore}/100</b> (${hazardLevel})
-            </span>
-          </td>
-          <td><span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span></td>
-          <td><span style="color:${vStatus === 'CONFIRMED' ? 'var(--emerald-safe)' : 'var(--amber-warn)'}; font-weight:700;">${vStatus}</span></td>
-          <td><span class="mono" style="color:#e2e8f0;">${geoText}</span></td>
-          <td><span class="mono">${lenM}m × ${widM}m (${areaM} m²)</span></td>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         </tr>
       `;
 
       dossierCards += `
         <div class="report-dossier-card">
           <div class="report-dossier-header">
-<<<<<<< HEAD
             <span class="report-dossier-title">#${idx + 1} ${objId} &mdash; ${cleanClass}</span>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
               <span class="provenance-tag ${srcTagClass}">[${srcTagLabel}]</span>
@@ -4355,49 +3435,12 @@ class DashboardApp {
             <div class="report-metric-pill">
               <span class="report-metric-lbl">ACOUSTIC VERIFICATION</span>
               <span class="report-metric-val" style="color:#059669; font-size:0.70rem; font-weight:700;"><i class="fa-solid fa-shield-check"></i> ${vStatus} (Score: ${verifyScore})</span>
-=======
-            <span class="report-dossier-title">#${idx + 1} ${d.object_id} &mdash; ${cleanClass}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span class="provenance-tag ${srcTagClass}">${srcTagLabel}</span>
-              <span class="priority-badge ${prioLevel.toLowerCase()}">PRIORITY: ${prioScore}/100</span>
-              <span class="hazard-badge ${hazardLevel.toLowerCase()}">HAZARD: ${hazardScore}/100</span>
-            </div>
-          </div>
-          <div style="font-size: 0.80rem; color: #d1e2f5; line-height: 1.45; margin-top: 4px;">
-            ${(d.score_explanation && d.score_explanation.narrative) || d.explanation || `Target ${d.object_id} validated via parallel dual-path AI inference with acoustic backscatter salience and shadow-relief correlation.`}
-          </div>
-          <div class="report-metric-pill-row">
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">INSPECTION PRIORITY</span>
-              <span class="report-metric-val" style="color:var(--cyan-beam); font-weight:800;">${prioScore}/100 (${prioLevel})</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">AI DETECTION CONF</span>
-              <span class="report-metric-val" style="color:var(--emerald-safe);">${conf}%</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">HAZARD RISK</span>
-              <span class="report-metric-val" style="color:var(--coral-danger);">${hazardScore}/100 (${hazardLevel})</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">GEOLOCATION</span>
-              <span class="report-metric-val" style="color:var(--cyan-beam); font-size:0.68rem;">${geoText}</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">METRIC EXTENT</span>
-              <span class="report-metric-val">${lenM}m × ${widM}m (${areaM} m²)</span>
-            </div>
-            <div class="report-metric-pill">
-              <span class="report-metric-lbl">VERIFY SCORE</span>
-              <span class="report-metric-val">${(d.verification_score || d.confidence || 0.88).toFixed(2)}</span>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             </div>
           </div>
         </div>
       `;
     });
 
-<<<<<<< HEAD
     const certCode = 'SHA256-MOES-' + String(missionId).replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
     const issueTime = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
@@ -4420,9 +3463,6 @@ class DashboardApp {
         </div>
       </div>
 
-=======
-    container.innerHTML = `
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
       <!-- 1. Side-by-Side Dual-Path Image Inspection Suite -->
       <div class="report-section-title">
         <i class="fa-solid fa-images"></i> Dual-Path Sonar Imagery Analysis Suite (Input vs AI Output)
@@ -4434,11 +3474,7 @@ class DashboardApp {
             <span class="report-img-tag input">Input Image</span>
           </div>
           <div class="report-img-box">
-<<<<<<< HEAD
             <img src="${rawUrl}" alt="Raw Acoustic Input Sonar" onerror="if(!this.src.endsWith('SURVEY_54434B1B_raw.png')){this.src='assets/samples/SURVEY_54434B1B_raw.png';}" />
-=======
-            <img src="${rawUrl}" alt="Raw Acoustic Input Sonar" />
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           </div>
         </div>
 
@@ -4448,11 +3484,7 @@ class DashboardApp {
             <span class="report-img-tag prep">Preprocessing</span>
           </div>
           <div class="report-img-box">
-<<<<<<< HEAD
             <img src="${enhancedUrl}" alt="CLAHE Contrast Enhanced Sonar" onerror="if(!this.src.endsWith('SURVEY_54434B1B_enhanced.png')){this.src='assets/samples/SURVEY_54434B1B_enhanced.png';}" />
-=======
-            <img src="${enhancedUrl}" alt="CLAHE Contrast Enhanced Sonar" />
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           </div>
         </div>
 
@@ -4462,11 +3494,7 @@ class DashboardApp {
             <span class="report-img-tag output">AI Output</span>
           </div>
           <div class="report-img-box">
-<<<<<<< HEAD
             <img src="${annotatedUrl}" alt="Parallel Dual-Path YOLO + U-Net AI Output" onerror="if(!this.src.endsWith('SURVEY_54434B1B_annotated.png')){this.src='assets/samples/SURVEY_54434B1B_annotated.png';}" />
-=======
-            <img src="${annotatedUrl}" alt="Parallel Dual-Path YOLO + U-Net AI Output" />
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           </div>
         </div>
       </div>
@@ -4478,11 +3506,7 @@ class DashboardApp {
       <div class="report-meta-grid">
         <div class="report-meta-card">
           <div class="rm-lbl">MISSION ID</div>
-<<<<<<< HEAD
           <div class="rm-val cyan">${missionId}</div>
-=======
-          <div class="rm-val cyan">${res.analysis_id || 'SURVEY_DUALPATH'}</div>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         </div>
         <div class="report-meta-card">
           <div class="rm-lbl">TOTAL TARGETS FUSED</div>
@@ -4494,11 +3518,7 @@ class DashboardApp {
         </div>
         <div class="report-meta-card">
           <div class="rm-lbl">GEODETIC DATUM & SWATH</div>
-<<<<<<< HEAD
           <div class="rm-val">${datumStr} · ${swathStr}</div>
-=======
-          <div class="rm-val">${spatial.coordinate_system || 'WGS84 (EPSG:4326)'} · 75m Swath</div>
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         </div>
       </div>
 
@@ -4506,20 +3526,14 @@ class DashboardApp {
       <div class="report-section-title">
         <i class="fa-solid fa-table-list"></i> Comprehensive Debris Inventory & Multi-Dimensional Intelligence (${detections.length} Objects)
       </div>
-<<<<<<< HEAD
       <div class="ablation-table-wrap" style="overflow-x: auto;">
         <table class="ablation-table" style="min-width: 1100px;">
-=======
-      <div class="ablation-table-wrap">
-        <table class="ablation-table">
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           <thead>
             <tr>
               <th>Target ID</th>
               <th>Debris Taxonomy</th>
               <th>Inspection Priority</th>
               <th>AI Confidence</th>
-<<<<<<< HEAD
               <th>Sonar-Aware Conf</th>
               <th>Hazard Risk</th>
               <th>Bounding Box (Norm / Px)</th>
@@ -4531,17 +3545,6 @@ class DashboardApp {
           </thead>
           <tbody>
             ${tableRows || '<tr><td colspan="11" style="text-align:center; padding:20px;">No debris targets detected.</td></tr>'}
-=======
-              <th>Hazard Risk</th>
-              <th>Dual Provenance</th>
-              <th>Acoustic Status</th>
-              <th>WGS84 Coordinates</th>
-              <th>Physical Dimensions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows || '<tr><td colspan="9" style="text-align:center; padding:20px;">No debris targets detected.</td></tr>'}
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
           </tbody>
         </table>
       </div>
@@ -4553,7 +3556,6 @@ class DashboardApp {
       <div class="report-dossier-grid">
         ${dossierCards || '<div style="grid-column: 1 / -1; padding:20px; color:#94a3b8; text-align:center;">No target dossiers generated.</div>'}
       </div>
-<<<<<<< HEAD
 
       <!-- 5. Official Hydrographic Certification Footer -->
       <div class="report-official-footer">
@@ -4907,11 +3909,6 @@ class DashboardApp {
     await this.executeAIPipeline();
   }
 
-=======
-    `;
-  }
-
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
   // =========================================================================
   // Adaptive Learning & Error Prevention Engine Methods
   // =========================================================================
@@ -5619,7 +4616,6 @@ class DashboardApp {
       }
     }
   }
-<<<<<<< HEAD
 
   _initEdgeModal() {
     const btnOpen = document.getElementById('btnOpenEdgeModal');
@@ -6278,14 +5274,11 @@ class DashboardApp {
       this.loadAndRenderEvaluationMetrics(false, targetScope);
     }
   }
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 }
 
 // Global API service initialization
 document.addEventListener('DOMContentLoaded', () => {
   window.app = new DashboardApp();
-<<<<<<< HEAD
   
   // Close role dropdown when clicking outside
   document.addEventListener('click', (e) => {
@@ -6304,6 +5297,4 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 });

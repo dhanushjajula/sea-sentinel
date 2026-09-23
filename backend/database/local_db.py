@@ -1,5 +1,4 @@
 """
-<<<<<<< HEAD
 Local SQLite Database Manager for Sea Sentinel (Edge-First, Offline-Native GIS).
 Maintains persistent spatial database for:
 - survey_images
@@ -17,16 +16,6 @@ import os
 import json
 import sqlite3
 import uuid
-=======
-Local SQLite Database Manager for Sea Sentinel (Edge-First, Offline-Native).
-Stores surveys, image metadata, detections, GIS events, sync queues, and model registries.
-"""
-
-from typing import Dict, Any, List, Optional
-import os
-import json
-import sqlite3
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 from datetime import datetime
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -36,13 +25,8 @@ DB_PATH = os.path.join(DB_DIR, "sea_sentinel_edge.db")
 
 class LocalDatabase:
     """
-<<<<<<< HEAD
     Robust local SQLite spatial database with automatic table creation, WAL mode for concurrency,
     indexed spatial queries, and multi-tier transaction support.
-=======
-    Robust local SQLite database with automatic table creation, WAL mode for fast concurrency,
-    and structured querying for offline edge deployments.
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     """
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
@@ -54,20 +38,13 @@ class LocalDatabase:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
-<<<<<<< HEAD
         conn.execute("PRAGMA foreign_keys=ON;")
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         return conn
 
     def _init_schema(self):
         with self.get_connection() as conn:
-<<<<<<< HEAD
             # 1. Base surveys table
             conn.execute("""
-=======
-            conn.executescript("""
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             CREATE TABLE IF NOT EXISTS surveys (
                 survey_id TEXT PRIMARY KEY,
                 image_id TEXT,
@@ -82,7 +59,6 @@ class LocalDatabase:
                 synced_at TEXT,
                 metadata_json TEXT
             );
-<<<<<<< HEAD
             """)
 
             # 2. Base detections table
@@ -104,24 +80,11 @@ class LocalDatabase:
                 segmentation_json TEXT,
                 sonar_x REAL,
                 sonar_y REAL,
-=======
-
-            CREATE TABLE IF NOT EXISTS detections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                survey_id TEXT,
-                object_id TEXT,
-                class_label TEXT,
-                confidence REAL,
-                detection_source TEXT,
-                bbox_json TEXT,
-                segmentation_json TEXT,
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
                 latitude REAL,
                 longitude REAL,
                 length_m REAL,
                 width_m REAL,
                 area_m2 REAL,
-<<<<<<< HEAD
                 uncertainty_radius REAL,
                 georeference_method TEXT,
                 georeference_quality TEXT,
@@ -272,15 +235,6 @@ class LocalDatabase:
 
             # 9. sync_queue, model_registry, benchmark_history
             conn.executescript("""
-=======
-                risk_score TEXT,
-                risk_category TEXT,
-                habitat_overlap_json TEXT,
-                created_at TEXT,
-                FOREIGN KEY (survey_id) REFERENCES surveys(survey_id)
-            );
-
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             CREATE TABLE IF NOT EXISTS sync_queue (
                 queue_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 survey_id TEXT UNIQUE,
@@ -316,7 +270,6 @@ class LocalDatabase:
                 budget_status TEXT,
                 system_specs TEXT
             );
-<<<<<<< HEAD
 
             -- Indexes for fast queries
             CREATE INDEX IF NOT EXISTS idx_survey_images_time ON survey_images(timestamp);
@@ -659,13 +612,6 @@ class LocalDatabase:
     # Backward-Compatible Survey & Detections Ingestion
     # -----------------------------------------------------------------
     def insert_survey(self, survey_data: Dict[str, Any], detections: List[Dict[str, Any]]) -> str:
-=======
-            """)
-            conn.commit()
-
-    def insert_survey(self, survey_data: Dict[str, Any], detections: List[Dict[str, Any]]) -> str:
-        """Inserts completed survey and associated detections, queuing for cloud sync."""
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         s_id = survey_data.get("survey_id") or survey_data.get("analysis_id") or f"SURV_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         ts = survey_data.get("timestamp") or datetime.utcnow().isoformat()
         mode = survey_data.get("processing_mode") or survey_data.get("mode") or "balanced"
@@ -691,7 +637,6 @@ class LocalDatabase:
             ))
 
             for d in detections:
-<<<<<<< HEAD
                 bbox = d.get("bbox") or d.get("pixel_bbox") or d.get("yolo_bbox") or d.get("unet_bbox") or []
                 if isinstance(bbox, dict):
                     bx = float(bbox.get("x1", 0.0))
@@ -725,27 +670,12 @@ class LocalDatabase:
                     "/".join(d.get("sources", ["fusion"])),
                     bx, by, bw, bh,
                     1 if d.get("polygon") else 0,
-=======
-                conn.execute("""
-                INSERT INTO detections 
-                (survey_id, object_id, class_label, confidence, detection_source, bbox_json, segmentation_json, 
-                 latitude, longitude, length_m, width_m, area_m2, risk_score, risk_category, habitat_overlap_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    s_id,
-                    d.get("object_id", "OBJ_001"),
-                    d.get("class", "debris"),
-                    float(d.get("calibrated_confidence", d.get("confidence", 0.8))),
-                    "/".join(d.get("sources", ["fusion"])),
-                    json.dumps(d.get("bbox", [])),
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
                     json.dumps(d.get("polygon", [])),
                     d.get("latitude"),
                     d.get("longitude"),
                     d.get("length_m", 1.0),
                     d.get("width_m", 1.0),
                     d.get("area_sq_m", 1.0),
-<<<<<<< HEAD
                     d.get("uncertainty_radius_m", 5.0),
                     d.get("georeference_method", "EXACT"),
                     d.get("georeference_quality", "EXACT"),
@@ -754,11 +684,6 @@ class LocalDatabase:
                     json.dumps(d.get("habitat_overlaps", [])),
                     "YOLO11+U-Net",
                     "v2.1",
-=======
-                    d.get("risk_score", "MEDIUM"),
-                    d.get("risk_category", "MODERATE"),
-                    json.dumps(d.get("habitat_overlaps", [])),
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
                     ts
                 ))
 
@@ -787,7 +712,6 @@ class LocalDatabase:
     def get_all_georeferenced_targets(self) -> List[Dict[str, Any]]:
         with self.get_connection() as conn:
             cursor = conn.execute("""
-<<<<<<< HEAD
             SELECT t.*, count(d.id) as total_detections
             FROM targets t
             LEFT JOIN detections d ON t.target_id = d.target_id
@@ -801,13 +725,3 @@ class LocalDatabase:
 def uuid_short() -> str:
     import uuid
     return uuid.uuid4().hex[:8]
-=======
-            SELECT d.*, s.image_name, s.timestamp as survey_time
-            FROM detections d
-            JOIN surveys s ON d.survey_id = s.survey_id
-            WHERE d.latitude IS NOT NULL AND d.longitude IS NOT NULL
-            ORDER BY d.created_at DESC
-            """)
-            rows = cursor.fetchall()
-            return [dict(r) for r in rows]
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f

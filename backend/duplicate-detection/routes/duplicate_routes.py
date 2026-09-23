@@ -2,11 +2,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any
-<<<<<<< HEAD
 from backend.duplicate_detection.services.multiframe_tracker import MultiFrameTrackerService
-=======
-from backend.duplicate-detection.services.multiframe_tracker import MultiFrameTrackerService
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 router = APIRouter(prefix="/duplicate-detection", tags=["Duplicate Detection"])
 tracker = MultiFrameTrackerService()

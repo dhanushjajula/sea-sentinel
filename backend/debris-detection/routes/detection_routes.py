@@ -2,11 +2,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-<<<<<<< HEAD
 from backend.debris_detection.services.yolo_service import YoloDetectorService
-=======
-from backend.debris-detection.services.yolo_service import YoloDetectorService
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 router = APIRouter(prefix="/debris-detection", tags=["Debris Detection"])
 detector = YoloDetectorService()

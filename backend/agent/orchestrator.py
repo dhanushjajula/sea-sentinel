@@ -16,10 +16,7 @@ Strictly adheres to modular tool boundaries; orchestrates specialized engines wi
 """
 
 from typing import Dict, Any, List, Optional
-<<<<<<< HEAD
 from datetime import datetime
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 import os
 import math
 import uuid
@@ -29,11 +26,8 @@ import cv2
 import concurrent.futures
 import numpy as np
 
-<<<<<<< HEAD
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 from ai.preprocessing.pipeline import SonarPreprocessor
 from ai.detection.yolo_detector import YOLODetector
 from ai.segmentation.unet_segmenter import UNetSegmenter
@@ -54,10 +48,7 @@ from inference.tiled_inference import TiledInferenceEngine
 from inference.fusion_engine import FusionEngine
 from inference.verifier import CandidateVerifier
 from inference.multiframe import MultiFrameTracker
-<<<<<<< HEAD
 from inference.sonar_aware_confidence import CalibrationModelLoader, calculate_sonar_aware_confidence
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 from evaluation.ablation_evaluator import AblationEvaluator
 from shared.hardware import HardwareDetector, PipelineProfiler, warmup_ai_models
 
@@ -108,7 +99,6 @@ class SIHPipelineAgent:
             if cand and os.path.exists(cand):
                 return os.path.abspath(cand)
                 
-<<<<<<< HEAD
         # Also check model subdirectories specifically for the matching base_name
         base_name = os.path.basename(raw_path)
         for subdir in ["yolo", "unet", "autoencoder"]:
@@ -119,21 +109,6 @@ class SIHPipelineAgent:
                 cand_ckpt = os.path.join(root_dir, "models", "checkpoints", subdir, base_name)
                 if os.path.exists(cand_ckpt):
                     return os.path.abspath(cand_ckpt)
-=======
-        # Also check project root models directory fallbacks
-        base_name = os.path.basename(raw_path)
-        common_fallbacks = [
-            os.path.join(project_dir, "models", "yolo", base_name),
-            os.path.join(project_dir, "models", "unet", base_name),
-            os.path.join(project_dir, "models", "autoencoder", base_name),
-            os.path.join(project_dir, "models", "yolo", "best.pt"),
-            os.path.join(project_dir, "models", "unet", "attention_unet_best.pt"),
-            os.path.join(project_dir, "models", "autoencoder", "baseline_autoencoder.pt")
-        ]
-        for fb in common_fallbacks:
-            if os.path.exists(fb):
-                return os.path.abspath(fb)
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
         return raw_path
 
@@ -244,15 +219,12 @@ class SIHPipelineAgent:
         self.champion_challenger = ChampionChallengerEvaluator(error_memory=self.error_memory)
         self.deployment_manager = AdaptiveDeploymentManager()
 
-<<<<<<< HEAD
         # Sonar-Aware Confidence Calibrator (Physics + Calibration Model)
         calib_model_path = os.path.join(PROJECT_ROOT, "models", "checkpoints", "sonar_confidence_calibrator.joblib")
         self.confidence_calibrator = CalibrationModelLoader(calib_model_path)
         if not self.confidence_calibrator.is_available():
             self.confidence_calibrator.train_and_save_default_model(calib_model_path)
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         # Version tracking
         self.current_yolo_version = "YOLO-v3.2"
         self.current_unet_version = "UNet-v2.5"
@@ -929,7 +901,6 @@ class SIHPipelineAgent:
             rec["polygon"] = poly
             rec["norm_polygon"] = norm_poly
             rec["mask_available"] = True
-<<<<<<< HEAD
             rec["bbox"] = bbox
             rec["pixel_bbox"] = bbox
             rec["yolo_bbox"] = det.get("yolo_bbox", bbox if "yolo" in det.get("sources", ["yolo"]) else None)
@@ -949,11 +920,6 @@ class SIHPipelineAgent:
             rec["confidence_status"] = sonar_calib_res.get("confidence_status")
             rec["extracted_sonar_features"] = sonar_calib_res.get("extracted_features")
 
-=======
-            rec["yolo_bbox"] = det.get("yolo_bbox", bbox if "yolo" in det.get("sources", ["yolo"]) else None)
-            rec["unet_bbox"] = det.get("unet_bbox", bbox if "unet" in det.get("sources", []) else None)
-
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             # Ensure coordinates and georeferencing status are populated for GIS mapping
             has_valid_coords = (lat is not None and lon is not None)
             rec["coordinates_available"] = has_valid_coords
@@ -961,10 +927,7 @@ class SIHPipelineAgent:
             rec["longitude"] = lon
             rec["lat"] = lat
             rec["lon"] = lon
-<<<<<<< HEAD
             rec["coordinates"] = [lat, lon] if has_valid_coords else None
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             rec["coordinate_system"] = (
                 raster_meta.get("crs") or "WGS84 (EPSG:4326)"
             ) if has_valid_coords else "UNREFERENCED"

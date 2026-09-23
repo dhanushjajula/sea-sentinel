@@ -52,18 +52,12 @@ class UNetSegmenter:
         self.is_model_loaded = False
         self.tiler = PatchTiler(patch_size=self.img_size, stride=int(self.img_size * 0.75))
 
-<<<<<<< HEAD
         self._load_model()
-=======
-        if self.checkpoint_path:
-            self._load_model()
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
     def _load_model(self) -> bool:
         """
         Loads trained checkpoint weights if available.
         """
-<<<<<<< HEAD
         if self.checkpoint_path is not None and not os.path.exists(self.checkpoint_path):
             self.is_model_loaded = False
             return False
@@ -78,14 +72,6 @@ class UNetSegmenter:
                 os.path.join(project_dir, "models", "unet", "attention_unet_best.pt"),
                 os.path.join(backend_dir, "models", "unet", "attention_unet_best.pt"),
                 os.path.join(backend_dir, "models", "checkpoints", "unet", "attention_unet_latest.pt"),
-=======
-        if not self.checkpoint_path or not os.path.exists(self.checkpoint_path):
-            backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            project_dir = os.path.dirname(backend_dir)
-            fallbacks = [
-                os.path.join(project_dir, "models", "unet", "attention_unet_best.pt"),
-                os.path.join(backend_dir, "models", "unet", "attention_unet_best.pt"),
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
                 os.path.join(project_dir, "models", "unet", "attention_unet_latest.pt")
             ]
             found = False
@@ -131,7 +117,6 @@ class UNetSegmenter:
                 num_classes=1,
                 features=features
             )
-<<<<<<< HEAD
 
             # Support FP16 optimized checkpoints: cast weights to match device parameter dtype
             if state_dict is not None:
@@ -144,9 +129,6 @@ class UNetSegmenter:
                         clean_state[k] = v
                 self.model.load_state_dict(clean_state)
 
-=======
-            self.model.load_state_dict(state_dict)
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             self.model.to(self.device)
             self.model.eval()
             self.is_model_loaded = True
@@ -175,7 +157,6 @@ class UNetSegmenter:
         Runs pixel-level segmentation on candidate detection ROI patch.
         Returns binary mask, mean confidence, and simplified polygon contours.
         """
-<<<<<<< HEAD
         if not self.is_model_loaded:
             return {
                 "status": "model_unavailable",
@@ -185,8 +166,6 @@ class UNetSegmenter:
                 "polygon": []
             }
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
         if image_patch is None or not isinstance(image_patch, np.ndarray) or image_patch.size == 0:
             return {
                 "status": "error",
@@ -228,7 +207,6 @@ class UNetSegmenter:
 
         # If neural mask is empty or model unavailable, use localized Otsu/adaptive acoustic highlight
         if np.sum(binary_mask) < 15:
-<<<<<<< HEAD
             blur = cv2.GaussianBlur(gray, (3, 3), 0)
             m_val = float(np.mean(blur))
             s_val = float(np.std(blur))
@@ -247,24 +225,6 @@ class UNetSegmenter:
         kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_OPEN, kernel_open)
         binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel_close)
-=======
-            blur = cv2.GaussianBlur(gray, (5, 5), 0)
-            m_val = float(np.mean(blur))
-            s_val = float(np.std(blur))
-            t_val = max(80.0, m_val + 0.25 * s_val)
-            _, acoustic_mask = cv2.threshold(blur, int(t_val), 255, cv2.THRESH_BINARY)
-            if np.sum(acoustic_mask > 0) >= 15:
-                binary_mask = (acoustic_mask > 0).astype(np.uint8)
-            else:
-                # Margin padded rectangular mask
-                pad_x = max(1, int(w_orig * 0.08))
-                pad_y = max(1, int(h_orig * 0.08))
-                binary_mask[pad_y:max(pad_y+1, h_orig - pad_y), pad_x:max(pad_x+1, w_orig - pad_x)] = 1
-
-        # Morphological smoothing
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel)
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
         # Extract contours and convert to global polygon vertices
         contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -272,18 +232,13 @@ class UNetSegmenter:
         if len(contours) > 0:
             # Sort by contour area and take largest
             cnt = max(contours, key=cv2.contourArea)
-<<<<<<< HEAD
             epsilon = 0.012 * cv2.arcLength(cnt, True)
-=======
-            epsilon = 0.015 * cv2.arcLength(cnt, True)
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             approx = cv2.approxPolyDP(cnt, max(1.0, epsilon), True)
             for pt in approx:
                 px, py = pt[0]
                 polygon_pts.append([round(float(ox + px), 1), round(float(oy + py), 1)])
 
         if len(polygon_pts) < 3:
-<<<<<<< HEAD
             cx, cy = ox + w_orig / 2.0, oy + h_orig / 2.0
             rx, ry = max(2.0, w_orig * 0.38), max(2.0, h_orig * 0.38)
             polygon_pts = [
@@ -291,13 +246,6 @@ class UNetSegmenter:
                 [round(cx + rx, 1), round(cy, 1)],
                 [round(cx, 1), round(cy + ry, 1)],
                 [round(cx - rx, 1), round(cy, 1)]
-=======
-            polygon_pts = [
-                [round(float(ox), 1), round(float(oy), 1)],
-                [round(float(ox + w_orig), 1), round(float(oy), 1)],
-                [round(float(ox + w_orig), 1), round(float(oy + h_orig), 1)],
-                [round(float(ox), 1), round(float(oy + h_orig), 1)]
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
             ]
 
         total_area = int(np.sum(binary_mask))
@@ -313,12 +261,9 @@ class UNetSegmenter:
             "model_type": self.model_type
         }
 
-<<<<<<< HEAD
     # Compatibility alias for orchestrator callers
     segment_crop = segment_roi
 
-=======
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
     def segment_full_image(
         self,
         image: np.ndarray,

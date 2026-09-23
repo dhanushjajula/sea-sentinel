@@ -2,11 +2,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import cv2
-<<<<<<< HEAD
 from backend.sonar_image_processing.services.sonar_filter_service import SonarFilterService
-=======
-from backend.sonar-image-processing.services.sonar_filter_service import SonarFilterService
->>>>>>> 449ab6fff1827af49bd4a885932dc0cd8729161f
 
 router = APIRouter(prefix="/sonar-processing", tags=["Sonar Image Processing"])
 
